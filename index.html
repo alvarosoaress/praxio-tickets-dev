@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: anexo:; media-src anexo:; frame-src anexo:">
+<title>Tickets</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Biblioteca de ícones: traço 1.5–1.7, 24x24, herda currentColor. -->
+<svg hidden aria-hidden="true">
+  <defs>
+    <g id="i-refresh" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 11a8 8 0 1 0-1.6 5.4"/><path d="M20 5.5V11h-5.5"/>
+    </g>
+    <g id="i-search" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+      <circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l4.5 4.5"/>
+    </g>
+    <g id="i-external" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M13 5h6v6"/><path d="M19 5l-8 8"/><path d="M17 14.5V19H5V7h4.5"/>
+    </g>
+    <g id="i-chevron" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 10l5 5 5-5"/>
+    </g>
+    <g id="i-back" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14.5 6 8.5 12l6 6"/>
+    </g>
+    <g id="i-key" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="8" cy="12" r="3.5"/><path d="M11.5 12H21"/><path d="M17.5 12v3.5"/><path d="M20.5 12v2.5"/>
+    </g>
+    <g id="i-alert" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 4.5 2.8 20h18.4L12 4.5Z"/><path d="M12 10v4.5"/><path d="M12 17.4v.1"/>
+    </g>
+    <g id="i-offline" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.5 8.5a15 15 0 0 1 6-3.2"/><path d="M14.5 5.4a15 15 0 0 1 6 3.1"/>
+      <path d="M7 12.4a10 10 0 0 1 3-1.7"/><path d="M14.2 10.8a10 10 0 0 1 2.8 1.6"/>
+      <path d="M10.4 16.1a4.5 4.5 0 0 1 3.2 0"/><path d="M12 19.5v.1"/><path d="M3 3l18 18"/>
+    </g>
+    <g id="i-inbox" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.5 13.5h4l1.5 3h6l1.5-3h4"/>
+      <path d="M3.5 13.5 6 5h12l2.5 8.5V19h-17v-5.5Z"/>
+    </g>
+    <g id="i-filter-off" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 5h16l-6 7v6l-4 2v-8L4 5Z"/><path d="M3 3l18 18"/>
+    </g>
+    <g id="i-thread" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 6.5h16"/><path d="M4 12h11"/><path d="M4 17.5h7"/>
+    </g>
+    <g id="i-eye" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/>
+    </g>
+    <g id="i-clip" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 11.5 12.2 18.3a4.1 4.1 0 0 1-5.8-5.8l7.4-7.4a2.7 2.7 0 0 1 3.9 3.9l-7.4 7.4a1.3 1.3 0 0 1-1.9-1.9l6.6-6.6"/>
+    </g>
+    <g id="i-close" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <path d="M6 6l12 12"/><path d="M18 6 6 18"/>
+    </g>
+    <!-- icones de tipo de arquivo: mesma folha, mesmo traco -->
+    <g id="f-image" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+      <rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4.5 17 4.8-4.4 3.4 3 3-2.4 3.8 3.4"/>
+    </g>
+    <g id="f-pdf" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+      <path d="M13.5 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9l-5.5-5.5Z"/><path d="M13.5 3.5V9H19"/><path d="M8.5 16.5c2-1 3-3.5 3-5.5 0-1-1.2-1.2-1.2 0 0 2.5 3 5 5.4 5"/>
+    </g>
+    <g id="f-sheet" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17"/><path d="M9.5 9.5v10"/><path d="M3.5 14.5h17"/>
+    </g>
+    <g id="f-doc" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+      <path d="M13.5 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9l-5.5-5.5Z"/><path d="M13.5 3.5V9H19"/><path d="M8.5 13h7"/><path d="M8.5 16.5h4.5"/>
+    </g>
+    <g id="f-code" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 8.5 5 12l4 3.5"/><path d="m15 8.5 4 3.5-4 3.5"/><path d="m13 5.5-2 13"/>
+    </g>
+    <g id="f-video" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+      <rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="m10.5 9.5 5 2.5-5 2.5Z"/>
+    </g>
+    <g id="f-zip" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+      <path d="M13.5 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9l-5.5-5.5Z"/><path d="M13.5 3.5V9H19"/><path d="M10 5v2"/><path d="M10 9v2"/><path d="M10 13v2"/>
+    </g>
+    <g id="f-file" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+      <path d="M13.5 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9l-5.5-5.5Z"/><path d="M13.5 3.5V9H19"/>
+    </g>
+  </defs>
+</svg>
+
+<!-- ============ LISTA ============ -->
+<div class="view" id="listView">
+
+  <header class="bar">
+    <div class="brand">TICKETS <span class="sep">/</span> <b id="count">—</b> em aberto</div>
+    <div class="bar-right">
+      <span class="updated" id="updated"></span>
+      <button class="btn" id="refresh"><svg viewBox="0 0 24 24"><use href="#i-refresh"/></svg><span id="refreshLabel">Atualizar</span></button>
+      <button class="btn btn-ghost btn-icon" id="settings" title="Chave da API" aria-label="Chave da API"><svg viewBox="0 0 24 24"><use href="#i-key"/></svg></button>
+    </div>
+    <div class="loadbar" id="loadbar" hidden></div>
+  </header>
+
+  <div class="notice" id="notice" hidden>
+    <svg viewBox="0 0 24 24"><use href="#i-alert"/></svg>
+    <span id="noticeText"></span>
+    <button class="btn" id="noticeAction" hidden></button>
+  </div>
+
+  <div class="filters" id="filters" hidden>
+    <label class="search">
+      <svg viewBox="0 0 24 24"><use href="#i-search"/></svg>
+      <input id="q" type="search" placeholder="buscar por título, cliente, módulo…" autocomplete="off" spellcheck="false">
+    </label>
+    <span class="sel"><select id="fResp" aria-label="Filtrar por responsável"></select><svg viewBox="0 0 24 24"><use href="#i-chevron"/></svg></span>
+    <span class="sel"><select id="fClient" aria-label="Filtrar por cliente"></select><svg viewBox="0 0 24 24"><use href="#i-chevron"/></svg></span>
+    <span class="sel"><select id="fStatus" aria-label="Filtrar por status"></select><svg viewBox="0 0 24 24"><use href="#i-chevron"/></svg></span>
+    <span class="spacer"></span>
+    <span class="matchcount" id="matchcount"></span>
+  </div>
+
+  <div class="scroll" id="scroll">
+    <div id="list" role="list"></div>
+    <div class="state" id="state" hidden></div>
+  </div>
+
+</div>
+
+<!-- ============ DETALHE ============ -->
+<div class="view" id="detailView" hidden>
+
+  <header class="bar">
+    <button class="btn btn-ghost btn-icon" id="back" title="Voltar (Esc)" aria-label="Voltar"><svg viewBox="0 0 24 24"><use href="#i-back"/></svg></button>
+    <div class="dtitle">
+      <span class="dnum" id="dNum"></span>
+      <span class="dname" id="dTitle"></span>
+    </div>
+    <div class="bar-right">
+      <span class="updated" id="dAge"></span>
+      <a class="btn" id="dPortal" target="_blank" rel="noreferrer"><svg viewBox="0 0 24 24"><use href="#i-external"/></svg>Abrir no portal</a>
+    </div>
+    <div class="loadbar" id="dLoadbar" hidden></div>
+  </header>
+
+  <div class="dmeta" id="dMeta"></div>
+
+  <div class="anexos" id="dAnexos" hidden>
+    <span class="anexos-label"><svg viewBox="0 0 24 24"><use href="#i-clip"/></svg><span id="dAnexosCount"></span></span>
+    <div class="anexos-strip" id="dAnexosStrip"></div>
+  </div>
+
+  <div class="filters" id="dFilters" hidden>
+    <label class="search">
+      <svg viewBox="0 0 24 24"><use href="#i-search"/></svg>
+      <input id="dq" type="search" placeholder="buscar nos trâmites…" autocomplete="off" spellcheck="false">
+    </label>
+    <span class="sel"><select id="dOrigin" aria-label="Filtrar por origem">
+      <option value="">Todas as origens</option>
+      <option value="operador">Operador</option>
+      <option value="cliente">Cliente</option>
+      <option value="privado">Privado</option>
+    </select><svg viewBox="0 0 24 24"><use href="#i-chevron"/></svg></span>
+    <span class="spacer"></span>
+    <span class="matchcount" id="dCount"></span>
+  </div>
+
+  <div class="scroll" id="dScroll">
+    <div id="tramites"></div>
+    <div class="state" id="dState" hidden></div>
+  </div>
+
+  <details class="views" id="dViews" hidden>
+    <summary>
+      <svg viewBox="0 0 24 24"><use href="#i-eye"/></svg>
+      <span id="dViewsLabel"></span>
+      <svg class="caret" viewBox="0 0 24 24"><use href="#i-chevron"/></svg>
+    </summary>
+    <div id="dViewsBody"></div>
+  </details>
+
+</div>
+
+<dialog id="viewer">
+  <header class="viewer-bar">
+    <svg class="viewer-icon" viewBox="0 0 24 24"><use id="viewerIconUse" href="#f-file"/></svg>
+    <span class="viewer-name" id="viewerName"></span>
+    <span class="viewer-meta" id="viewerMeta"></span>
+    <span class="viewer-tabs" id="viewerTabs"></span>
+    <a class="btn btn-ghost" id="viewerPortal" target="_blank" rel="noreferrer"><svg viewBox="0 0 24 24"><use href="#i-external"/></svg>Portal</a>
+    <button class="btn btn-ghost btn-icon" id="viewerClose" title="Fechar (Esc)" aria-label="Fechar"><svg viewBox="0 0 24 24"><use href="#i-close"/></svg></button>
+  </header>
+  <div class="viewer-body" id="viewerBody"></div>
+</dialog>
+
+<dialog id="cfg">
+  <form method="dialog" id="cfgForm">
+    <div class="dlg-body">
+      <h2>Chave da API</h2>
+      <p>O app lê os tickets de <code>portalapi.188720391.xyz</code>. Cole a chave de 104 caracteres — ela fica só nesta máquina.</p>
+      <div class="field" id="cfgField">
+        <label for="cfgKey">Authorization</label>
+        <input id="cfgKey" type="password" placeholder="cole a chave aqui" autocomplete="off" spellcheck="false">
+        <div class="counter">
+          <span id="cfgError" class="err"></span>
+          <span id="cfgCount">0 / 104</span>
+        </div>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" type="button" id="cfgCancel">Cancelar</button>
+      <button class="btn btn-primary" type="submit" id="cfgSave">Salvar e carregar</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="sanitize.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{
+  "name": "tickets",
+  "version": "1.0.0",
+  "description": "Tickets abertos que precisam de acao do time de desenvolvimento",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "test": "node test.js"
+  },
+  "author": "",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.alvaro.tickets",
+    "productName": "Tickets",
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "renderer.js",
+      "sanitize.js",
+      "style.css",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "portable"
+    }
+  },
+  "dependencies": {
+    "mammoth": "^1.12.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}
