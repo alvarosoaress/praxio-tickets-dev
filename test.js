@@ -1,7 +1,7 @@
 // node test.js — checa o parser de data BR e o mecanismo de envelhecimento,
 // que e o sinal principal da tela. Sem framework de proposito.
 const assert = require('assert');
-const { parseBR, minutesSince, ageLabel, ageBucket, statusKey, matches, prettyXml, kindOf } = require('./renderer.js');
+const { parseBR, minutesSince, ageLabel, ageBucket, statusKey, matches, prettyXml, kindOf, anexosDe, cacheGet, cachePut } = require('./renderer.js');
 const { safeHref, KEEP, NUKE, PORTAL_BASE } = require('./sanitize.js');
 const { buildPrompt, parseResult, MAX_PROMPT_CHARS } = require('./services/claude.js');
 const { parseResumo } = require('./renderer.js');
@@ -191,5 +191,23 @@ assert.ok(parseResumo('ONDE@x@RISCO@y'.split('@').join('\n'))[0].body.includes('
 assert.deepStrictEqual(parseResumo(''), []);
 assert.deepStrictEqual(parseResumo(null), []);
 
+
+// faixa de anexos derivada dos tramites: substituiu a request a /anexos/:id, entao a
+// planificacao tem que achar todo anexo e nao inventar nenhum
+assert.deepStrictEqual(anexosDe([{ anexos: [{ id: '1' }] }, { id: 'x' }, { anexos: [{ id: '2' }, { id: '3' }] }]).map(a => a.id), ['1', '2', '3']);
+assert.deepStrictEqual(anexosDe([{ id: 'x' }]), [], 'tramite sem anexo nao quebra nem entra na faixa');
+assert.deepStrictEqual(anexosDe([]), []);
+assert.deepStrictEqual(anexosDe(null), []);
+
+// cache do detalhe: a chave e lastUpdate, porque trâmite novo move lastUpdate. Servir
+// tramites velhos como se fossem os atuais e pior que refazer a chamada.
+const D1 = { tramites: [{ content: 'velho' }], views: [] };
+cachePut('937919', '14/09/2026 10:16:35', D1);
+assert.strictEqual(cacheGet('937919', '14/09/2026 10:16:35'), D1, 'mesmo lastUpdate reaproveita');
+assert.strictEqual(cacheGet('937919', '14/09/2026 11:20:00'), null, 'lastUpdate novo invalida');
+assert.strictEqual(cacheGet('939415', '14/09/2026 10:16:35'), null, 'cache e por ticket');
+assert.strictEqual(cacheGet('937919', null), null, 'sem lastUpdate nao ha invalidacao possivel');
+cachePut('000', null, D1);
+assert.strictEqual(cacheGet('000', null), null, 'e ticket sem lastUpdate nao entra no cache');
 
 console.log('ok');

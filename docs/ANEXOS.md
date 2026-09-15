@@ -14,11 +14,10 @@ disco, em nenhum momento.
 ```
 portal                          API                      main                renderer
 ──────                          ───                      ────                ────────
-/Ticket/TicketTramitesAnexosTodos
-  ?id_ticket=938963      ──▶  GET /anexos/:id     ──▶  IPC 'anexos'    ──▶  faixa do topo
-/Ticket/TicketTramitesAnexos
-  ?id_tramite=7661055    ──▶  GET /tramites/:id   ──▶  IPC             ──▶  chips no trâmite
-                                 ?anexos=1              'ticket-detail'
+/Ticket/TicketTramitesAnexos                                       ┌─▶  chips no trâmite
+  ?id_tramite=7661055    ──▶  GET /tramites/:id   ──▶  IPC         ─┤
+                                 ?anexos=1              'ticket-detail'  └─▶  faixa do topo
+                                                                        (anexosDe: flatMap)
 /Anexo/CadastroAnexoDownload/1218235
                          ──▶  GET /anexo/:id      ──▶  anexo://portal/:id  ──▶ <img>/<iframe>
                                                    └▶  IPC 'anexo-text'    ──▶ <pre>
@@ -50,6 +49,14 @@ Respondem a perguntas diferentes:
 
 A faixa do topo é fixa, não acordeão: os anexos são o motivo de muita gente abrir o ticket,
 e escondê-los atrás de um clique inverteria a prioridade.
+
+**As duas listas vêm da mesma resposta.** A faixa já foi uma chamada a `GET /anexos/:id`;
+hoje é `anexosDe(tramites)`, um `flatMap` sobre o que o `?anexos=1` já trouxe. As duas rotas
+devolvem exatamente os mesmos arquivos — conferido nos 4 tickets da fila, zero diferença de
+id — e o portal serializa requisições da mesma sessão, então a chamada extra não era grátis:
+entrava na fila na frente dos trâmites. A única coisa que se perde é `uploadedAt`, que o
+partial por trâmite não traz; ele aparecia no `title` do chip e no meta do visualizador, e
+os dois já filtravam valor vazio.
 
 Dentro do trâmite os chips **quebram linha em vez de rolar** — no meio do texto, um arquivo
 escondido atrás de scroll horizontal simplesmente desaparece.
@@ -130,13 +137,13 @@ sanitizador aceita esse caso específico — menos SVG, que carrega script.
 | arquivo | zip, rar, 7z, gz, tar | **sem preview** — mensagem + botão do portal |
 | resto | pfx, exe, … | idem |
 
-A classificação sai da extensão (`KINDS`, `renderer.js:239`) porque a listagem do portal não
+A classificação sai da extensão (`KINDS`, `renderer.js:243`) porque a listagem do portal não
 manda mime. Chip de tipo sem preview leva borda tracejada — o usuário sabe antes de clicar.
 
 ### `prettyXml`
 
 XML de NF-e chega numa linha só de dezenas de milhares de caracteres. `prettyXml()`
-(`renderer.js:327`) indenta e mantém elemento de folha numa linha só (`<cUF>14</cUF>`).
+(`renderer.js:331`) indenta e mantém elemento de folha numa linha só (`<cUF>14</cUF>`).
 É um parser, então tem checagem em `test.js` — inclusive para garantir que nenhum conteúdo
 se perde na formatação.
 

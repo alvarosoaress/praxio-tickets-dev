@@ -33,13 +33,31 @@ A chave vive em `%APPDATA%\tickets\config.json` e não aparece em nenhum arquivo
 | Método | Rota | Uso | Tempo típico |
 | --- | --- | --- | --- |
 | `GET` | `/scrape-custom/27662` | a fila inteira | ~3,5 s |
-| `GET` | `/tramites/:ticketId?anexos=1` | histórico do ticket + anexos por trâmite | ~1–2 s |
+| `GET` | `/tramites/:ticketId?anexos=1` | histórico do ticket + anexos por trâmite | ~0,5–2,2 s |
 | `GET` | `/visualizacoes/:ticketId` | quem leu o ticket | ~0,5 s |
-| `GET` | `/anexos/:ticketId` | todos os anexos do ticket | ~0,6 s |
+| `GET` | `/anexos/:ticketId` | todos os anexos do ticket | ~0,6 s — **o app não usa mais** |
 | `GET` | `/anexo/:anexoId` | os **bytes** do arquivo | varia com o tamanho |
 
 A API tem outras rotas (`/sla`, `/ticketsbi`, `/ticket/:ticket`, `/alltickets`) que este app
 não usa. Estão documentadas no `CONTEXT.md` do `portal-scraper`.
+
+### O portal serializa por sessão — chamada paralela não é grátis
+
+O `portal-scraper` mantém **um cookie jar global** (`index.js:19-20`) para todas as rotas e
+para os jobs de background do SLA/BI. O portal é ASP.NET, e ASP.NET serializa requisições
+concorrentes que dividem o mesmo `ASP.NET_SessionId`. Resultado: os tempos **somam** em vez
+de se sobrepor. Medido em produção, ticket 938963:
+
+```
+/tramites/938963?anexos=1 sozinho ............ 2365 2133 2221 ms
+   ... com /visualizacoes em paralelo ........ 3292 ms
+   ... com /visualizacoes e /anexos .......... 3704 / 4349 ms
+```
+
+O mesmo vale dentro do `?anexos=1`: o código usa `Promise.all` (`index.js:426-438`), mas o
+delta cresce linear com o número de trâmites-com-anexo — ~250 a 350 ms cada. Por isso este
+app faz **uma chamada de cada vez** no detalhe (`ipc/tickets.js`) e derivou a faixa de
+anexos dos trâmites em vez de pedir `/anexos/:id`.
 
 Todas em produção. `/anexos`, `/anexo/:id` e o `?anexos=1` foram as últimas a subir e são
 as únicas que o `CONTEXT.md` do `portal-scraper` ainda não documenta.

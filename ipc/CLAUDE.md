@@ -6,8 +6,8 @@ A fronteira com o renderer. Um arquivo por domínio, cada um exportando `registe
 | Arquivo      | Canais                                          |
 | ------------ | ----------------------------------------------- |
 | `config.js`  | `has-key`, `set-key`, `claude-ok`, `claude-allow` |
-| `tickets.js` | `tickets`, `ticket-detail`                       |
-| `anexos.js`  | `anexos`, `anexo-text`, `anexo-html` + `registerProtocol()` |
+| `tickets.js` | `tickets`, `ticket-detail`, `ticket-views`       |
+| `anexos.js`  | `anexo-text`, `anexo-html` + `registerProtocol()` |
 | `resumo.js`  | `resumo`                                         |
 
 `registerProtocol()` é a exceção: precisa rodar **dentro** do `whenReady`. O
@@ -33,7 +33,8 @@ Dois motivos para ele existir separado de `services/claude.js`:
 - **O gate de consentimento.** Sem `claudeOk` no `config.json`, devolve `{ error:
   'NO_CONSENT' }` e não chama nada. O conteúdo do ticket sai da máquina; o usuário
   autoriza uma vez.
-- **O cache.** Fica em disco, em `%APPDATA%	icketsesumos.json`
+- **O cache.** Fica em disco, em `%APPDATA%	ickets
+esumos.json`
   ([`services/resumos.js`](../services/CLAUDE.md)), e **sobrevive ao restart** — reabrir o
   mesmo ticket amanhã não paga de novo.
 

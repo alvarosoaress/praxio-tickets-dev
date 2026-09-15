@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('api', {
   setKey: key => ipcRenderer.invoke('set-key', key),
   loadTickets: () => ipcRenderer.invoke('tickets'),
   loadDetail: id => ipcRenderer.invoke('ticket-detail', id),
-  loadAnexos: id => ipcRenderer.invoke('anexos', id),
+  loadViews: id => ipcRenderer.invoke('ticket-views', id),
   anexoHtml: (id, kind) => ipcRenderer.invoke('anexo-html', { id, kind }),
   anexoText: id => ipcRenderer.invoke('anexo-text', id),
   claudeOk: () => ipcRenderer.invoke('claude-ok'),

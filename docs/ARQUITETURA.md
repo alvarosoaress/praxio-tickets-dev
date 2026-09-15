@@ -46,8 +46,8 @@ Dez canais, todos definidos em `preload.js` e implementados em [`ipc/`](../ipc/C
 | `claude-ok` | — | `boolean` | `ipc/config.js` |
 | `claude-allow` | — | `{ ok }` | `ipc/config.js` |
 | `tickets` | — | `{ tickets }` ou `{ error }` | `ipc/tickets.js` |
-| `ticket-detail` | `ticketId` | `{ tramites, views }` ou `{ error }` | `ipc/tickets.js` |
-| `anexos` | `ticketId` | `{ anexos }` ou `{ error }` | `ipc/anexos.js` |
+| `ticket-detail` | `ticketId` | `{ tramites }` ou `{ error }` | `ipc/tickets.js` |
+| `ticket-views` | `ticketId` | `{ views }` ou `{ error }` | `ipc/tickets.js` |
 | `anexo-text` | `anexoId` | `{ text }` ou `{ error }` | `ipc/anexos.js` |
 | `anexo-html` | `{ id, kind }` | `{ sheets }` ou `{ error }` | `ipc/anexos.js` |
 | `resumo` | `{ id, ticket, tramites, refazer }` | `{ text, cached? }` ou `{ error }` | `ipc/resumo.js` |
@@ -95,10 +95,10 @@ não-ok todos para a mesma forma `{ error, status }`.
 
 ## Fluxo da lista
 
-1. `load()` (`renderer.js:610`) → canal `tickets` → `GET /scrape-custom/27662`.
+1. `load()` (`renderer.js:763`) → canal `tickets` → `GET /scrape-custom/27662`.
 2. Sucesso: guarda em `tickets`, popula os selects a partir dos valores presentes
    (`syncSelects`, `renderer.js:95`), renderiza.
-3. `render()` (`renderer.js:187`) filtra em memória e **ordena por tempo parado
+3. `render()` (`renderer.js:191`) filtra em memória e **ordena por tempo parado
    decrescente** — o mais esquecido no topo.
 4. `setInterval(load, 5 min)` e um segundo `setInterval` de 60 s que só re-renderiza para
    as idades avançarem sem bater na API.
@@ -112,24 +112,42 @@ disso seria cerimônia.
 
 ## Fluxo do detalhe
 
-`openDetail(t)` (`renderer.js:548`) troca a `view` inteira — não é split nem drawer.
+`openDetail(t, refazer)` (`renderer.js:570`) troca a `view` inteira — não é split nem drawer.
 A 1280 px, dividir espremeria os dois lados.
 
 ```
 openDetail(ticket)
    ├─ ticketId(ticket)                 extrai o id numérico do link do portal
    ├─ renderDetailHeader()             imediato, com o que a lista já tinha
-   ├─ api.loadAnexos(id)      ─┐ paralelo, não segura os trâmites
-   └─ api.loadDetail(id)      ─┘ tramites + visualizações em Promise.all no main
+   ├─ cacheGet(id, lastUpdate)         acerto → renderiza e para aqui, sem rede
+   ├─ api.loadDetail(id)               GET /tramites/:id?anexos=1 — sozinho na linha
+   ├─ renderTramites() + renderAnexos(anexosDe(tramites))
+   └─ api.loadViews(id)                só depois, com a tela já preenchida
 ```
+
+**Uma chamada de cada vez, em série.** Parece contraintuitivo, mas o portal é ASP.NET e
+serializa requisições que dividem a mesma sessão — e a API tem um cookie jar global. Duas
+chamadas em paralelo não se sobrepõem: fazem fila, e a que a tela espera fica atrás.
+Medido em produção no ticket 938963: `/tramites?anexos=1` leva **2,2 s** sozinho e **4,1 s**
+com `/visualizacoes` e `/anexos` disparados junto.
+
+**A faixa de anexos sai dos próprios trâmites** (`anexosDe`), não de uma rota. `/anexos/:id`
+devolve exatamente os mesmos arquivos — conferido nos 4 tickets da fila, zero diferença de
+id — e custava uma posição na fila do portal. Perde-se `uploadedAt`, que o partial por
+trâmite não traz e que só aparecia no `title` do chip.
+
+**Cache em memória por `lastUpdate`.** Reabrir um ticket cujo `lastUpdate` não mudou desde
+a última leitura renderiza na hora, sem rede (`cacheGet`/`cachePut`). É a única invalidação
+possível: a API não tem cache nem ETag. `F5` dentro do detalhe passa por cima.
 
 **Cancelamento por identidade.** Não há `AbortController`: `openDetail` compara
 `current !== t` depois do await e descarta o resultado se o usuário já saiu ou abriu outro
 ticket. O visualizador de anexo usa a mesma ideia com um token (`openViewer.token`), porque
 lá pode haver duas conversões em voo.
 
-**Visualizações são acessórias.** Se `/visualizacoes` falhar, o main devolve `views: []` e
-o ticket abre assim mesmo (`ipc/tickets.js`). Só os trâmites são obrigatórios.
+**Visualizações são acessórias.** Chegam num canal próprio, pedido só depois que os
+trâmites estão na tela. Se falharem, `views` fica `[]` e o ticket não muda. Elas caem no
+objeto cacheado mesmo que o usuário já tenha voltado para a lista.
 
 ---
 
@@ -165,7 +183,7 @@ detalhe — a diferença é só o container.
 | `Esc` | limpa a busca | 1º limpa a busca, 2º volta à lista | fecha (nativo do `<dialog>`) |
 | `Enter` | abre a linha focada | — | — |
 
-O handler global (`renderer.js:720`) sai cedo quando um `<dialog>` está aberto: eles cuidam
+O handler global (`renderer.js:884`) sai cedo quando um `<dialog>` está aberto: eles cuidam
 do próprio `Esc`.
 
 ---

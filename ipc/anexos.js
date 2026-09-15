@@ -1,15 +1,9 @@
 const { ipcMain, protocol } = require('electron');
 const { apiKey } = require('../services/config');
-const { get, anexoBytes, anexoStream } = require('../services/portalapi');
+const { anexoBytes, anexoStream } = require('../services/portalapi');
 const { MAX_CONVERT_BYTES, MIME, toText, toHtml } = require('../services/anexo');
 
 function register() {
-  ipcMain.handle('anexos', async (_e, id) => {
-    if (!/^\d+$/.test(String(id))) return { error: 'ID de ticket inválido.' };
-    const b = await get(`/anexos/${id}`, 60_000);
-    return b.error ? b : { anexos: b.anexos || [] };
-  });
-
   // Arquivos de texto vêm pelo IPC, não por fetch('anexo://…'): o protocolo é outra
   // origem e o fetch morreria em CORS. <img>/<video>/<iframe> não têm esse problema.
   ipcMain.handle('anexo-text', async (_e, id) => {

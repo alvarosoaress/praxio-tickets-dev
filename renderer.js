@@ -549,7 +549,25 @@ function renderViews() {
   body.appendChild(grid);
 }
 
-async function openDetail(t) {
+// A faixa de anexos sai dos proprios tramites. Ela vinha de /anexos/:id, que devolve
+// exatamente os mesmos arquivos numa request extra — e request extra custa caro aqui: o
+// portal e ASP.NET e serializa o que divide a sessao, entao a chamada de anexos entrava na
+// fila na frente dos tramites. Unica perda: uploadedAt, que o partial por tramite nao traz.
+const anexosDe = tramites => (tramites || []).flatMap(tr => tr.anexos || []);
+
+// Reabrir um ticket nao deve refazer o scraping inteiro. lastUpdate e a unica invalidacao
+// possivel — a API nao tem cache nem ETag — e e honesta: se o portal nao registrou trâmite
+// novo, os tramites sao os mesmos. Sem lastUpdate nao ha como saber, entao nao cacheia.
+const detailCache = new Map();
+function cacheGet(id, lastUpdate) {
+  const hit = lastUpdate ? detailCache.get(id) : null;
+  return hit && hit.lastUpdate === lastUpdate ? hit.detail : null;
+}
+function cachePut(id, lastUpdate, d) {
+  if (lastUpdate) detailCache.set(id, { lastUpdate, detail: d });
+}
+
+async function openDetail(t, refazer) {
   const id = ticketId(t);
   current = t;
   detail = null;
@@ -572,13 +590,18 @@ async function openDetail(t) {
     return;
   }
 
+  const cache = refazer ? null : cacheGet(id, t.lastUpdate);
+  if (cache) {
+    detail = cache;
+    $('dResumir').disabled = false;
+    renderTramites();
+    renderAnexos(anexosDe(cache.tramites));
+    renderViews();
+    return;
+  }
+
   $('dLoadbar').hidden = false;
   showStateIn('dState', 'empty', 'i-thread', 'Carregando trâmites…', 'Buscando o histórico no portal.');
-
-  // Anexos vêm de outra rota e chegam quando chegarem: não seguram os trâmites.
-  window.api.loadAnexos(id).then(r => {
-    if (current === t && !r.error) renderAnexos(r.anexos);
-  });
 
   const res = await window.api.loadDetail(id);
   $('dLoadbar').hidden = true;
@@ -586,14 +609,22 @@ async function openDetail(t) {
 
   if (res.error) {
     const txt = res.error === 'NO_KEY' ? 'Chave da API não configurada.' : res.error;
-    showStateIn('dState', 'error', 'i-alert', 'Não foi possível carregar o ticket', txt, 'Tentar de novo', () => openDetail(t));
+    showStateIn('dState', 'error', 'i-alert', 'Não foi possível carregar o ticket', txt, 'Tentar de novo', () => openDetail(t, true));
     return;
   }
 
-  detail = res;
+  const d = { tramites: res.tramites, views: [] };
+  detail = d;
+  cachePut(id, t.lastUpdate, d);
   $('dResumir').disabled = false;
   renderTramites();
-  renderViews();
+  renderAnexos(anexosDe(res.tramites));
+
+  // Visualizacoes sao acessorias e entram na mesma fila do portal: so agora, com os
+  // tramites ja na tela. Chegam no objeto cacheado mesmo que o usuario ja tenha saido.
+  const v = await window.api.loadViews(id);
+  if (!v.error) d.views = v.views;
+  if (current === t) renderViews();
 }
 
 function closeDetail() {
@@ -854,7 +885,7 @@ document.addEventListener('keydown', e => {
   if ($('cfg').open || $('viewer').open || $('resumo').open || $('claudeAsk').open) return;   // dialogs cuidam do proprio Esc
   if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r')) {
     e.preventDefault();
-    inDetail() ? (current && openDetail(current)) : load();
+    inDetail() ? (current && openDetail(current, true)) : load();
     return;
   }
   if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
@@ -882,4 +913,4 @@ load();
 }
 
 if (typeof document !== 'undefined') wire();
-if (typeof module !== 'undefined') module.exports = { parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf, parseResumo };
+if (typeof module !== 'undefined') module.exports = { parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf, parseResumo, anexosDe, cacheGet, cachePut };

@@ -92,7 +92,7 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
    um branch só e nenhum try/catch. Quebrar isso espalha try/catch por toda a UI.
 
 4. **Um refresh que falha nunca esvazia a tela.** Se já havia lista, mostra o aviso e
-   mantém as linhas antigas com o timestamp antigo (`onError` em `renderer.js:628`). Lista
+   mantém as linhas antigas com o timestamp antigo (`onError` em `renderer.js:781`). Lista
    visivelmente velha é melhor que tela vazia.
 
 5. **Erro da API é renderizado verbatim.** `/scrape-custom` devolve `401 "Falha no login"`
@@ -150,8 +150,9 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Tela pede a chave toda vez que abre             | `config.json` não gravou. `services/config.js`, pasta `%APPDATA%\tickets`                                                |
 | "Chave rejeitada pela API" com chave certa      | A API compara só os primeiros 104 chars. Espaço colado junto passa; chave curta não                                                     |
 | "A API não conseguiu buscar os tickets"         | Erro do servidor, não seu. O login da própria API no portal falhou — ver `PORTAL_LOGIN`/`PORTAL_PASSWORD` no `.env` do `portal-scraper` |
-| Lista carrega mas a faixa de anexos não aparece | `/anexos/:ticketId` falhou. O app esconde a faixa em vez de mostrar erro — anexo é acessório. Conferir a rota com `curl` |
+| Lista carrega mas a faixa de anexos não aparece | A faixa sai do `anexos` de cada trâmite (`anexosDe`), não de rota própria. Se os trâmites vieram sem `anexos`, faltou o `?anexos=1` |
 | Anexos não aparecem dentro dos trâmites         | Falta o `?anexos=1` na chamada (`ipc/tickets.js`), ou a API apontada é anterior a essa rota |
+| Trâmite editado no portal não aparece ao reabrir | Cache por `lastUpdate` (`renderer.js`). Se o portal não mexeu no `lastUpdate`, o app serve o que tinha. `F5` no detalhe ignora o cache |
 | PDF abre "Salvar como" em vez de renderizar     | `Content-Disposition: attachment` vazando do portal. O handler força `inline` (`ipc/anexos.js`)                                           |
 | Imagem do anexo vira ícone quebrado             | Id foi para o _host_ do `anexo://` em vez do path — host numérico vira IPv4 decimal                                                     |
 | `fetch('anexo://…')` falha no renderer          | CORS. Texto/planilha/docx vão por IPC; só `<img>`/`<video>`/`<iframe>` usam a URL                                                       |
@@ -162,7 +163,8 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Resumir devolve "Not logged in"                 | O CLI está instalado mas sem login. `claude /login` no terminal. Nunca é a chave da API do app |
 | Botão Resumir fica desabilitado                 | Ele só libera quando os trâmites chegam — é o que ele manda para o Claude (`openDetail`) |
 | Resumo não atualiza depois de um trâmite novo   | Esperado: o cache não se refaz sozinho. A faixa âmbar avisa e "Refazer" atualiza |
-| Resumo some ao reabrir o app                    | `%APPDATA%	icketsesumos.json` não gravou. Apagar o arquivo é seguro — só perde cache |
+| Resumo some ao reabrir o app                    | `%APPDATA%	ickets
+esumos.json` não gravou. Apagar o arquivo é seguro — só perde cache |
 
 ---
 
@@ -236,3 +238,11 @@ silêncio.
   cliente nunca foram exercitados com variedade real.
 - ⚠️ **`/scrape-custom` não tem cache.** Cada refresh refaz o scraping inteiro no servidor.
   Com a fila atual (4 tickets) custa ~3,5 s; numa fila grande isso vira minutos.
+- ⚠️ **O ganho de velocidade que sobrou está no `portal-scraper`, não aqui.** Deste lado já
+  se cortou tudo: uma chamada por vez, faixa derivada dos trâmites, cache por `lastUpdate`.
+  O que falta é lá e precisa de aprovação (é outro repo): `?anexos=1` usar o
+  `fetchAnexos` que já existe (`anexos.js:23-39`, uma request no lugar de N — hoje são
+  ~250-350 ms por trâmite-com-anexo); mutex de login em voo, para a sessão expirada não
+  virar N logins concorrentes; `timeout` no `axios.create` (`index.js:20`), que hoje não
+  tem nenhum; e, o maior de todos, uma sessão por rota interativa em vez do cookie jar
+  global — é ele que põe `/tramites` na mesma fila dos jobs de SLA/BI.
