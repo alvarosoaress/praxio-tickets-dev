@@ -92,8 +92,11 @@ function fillSelect(sel, values, allLabel) {
   sel.dataset.active = sel.value ? '1' : '0';
 }
 
+// Valores distintos de um campo, na ordem do pt-BR. Usado pelos selects de filtro e pela
+// lista de modulos do dialog de configuracao.
+const uniq = key => [...new Set((tickets || []).map(t => t[key]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
 function syncSelects() {
-  const uniq = key => [...new Set(tickets.map(t => t[key]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   fillSelect($('fResp'), uniq('responsible'), 'Todos responsáveis');
   fillSelect($('fClient'), uniq('client'), 'Todos clientes');
   fillSelect($('fStatus'), uniq('status'), 'Todos status');
@@ -813,18 +816,168 @@ function onError(error, status) {
 
 /* ---------- configuracao ---------- */
 
-function openConfig() {
-  const dlg = $('cfg');
-  $('cfgKey').value = '';
-  $('cfgError').textContent = '';
+// Espelho da tela enquanto o dialog esta aberto. Nao e estado do app: some ao fechar.
+let cfgRepos = [];
+let keySaved = false;
+
+// A chave NUNCA chega ao renderer (regra de ouro #1) — hasKey() devolve boolean e mais
+// nada. Estas 104 bolinhas sao geradas aqui e so dizem "ja existe uma chave gravada".
+const KEY_MASK = '•'.repeat(104);
+const mascarado = () => $('cfgKey').value === KEY_MASK;
+
+function mascarar() {
+  const inp = $('cfgKey');
+  inp.value = KEY_MASK;
+  inp.dataset.mask = '1';
+  $('cfgCount').textContent = 'chave configurada';
+  $('cfgSave').disabled = false;
+  $('cfgSave').textContent = 'Salvar';
+}
+
+function desmascarar() {
+  const inp = $('cfgKey');
+  inp.value = '';
+  inp.dataset.mask = '0';
   $('cfgCount').textContent = '0 / 104';
+}
+
+async function openConfig() {
+  const dlg = $('cfg');
+  $('cfgError').textContent = '';
   $('cfgField').dataset.invalid = '0';
-  dlg.showModal();
-  $('cfgKey').focus();
+  desmascarar();
+  $('cfgSave').disabled = true;
+  $('cfgSave').textContent = 'Salvar e carregar';
+  if (!dlg.open) dlg.showModal();
+
+  const [temChave, res] = await Promise.all([window.api.hasKey(), window.api.getRepos()]);
+  keySaved = temChave;
+  // Com chave gravada nao ha nada a fazer neste campo, entao ele nao rouba o foco; sem
+  // ela, colar a chave e a unica tarefa da tela.
+  if (keySaved) mascarar();
+  else $('cfgKey').focus();
+
+  cfgRepos = res.repos || [];
+  renderRepos();
+}
+
+// Os modulos saem da fila ja carregada — nao existe rota que os liste. Na primeira
+// execucao nao ha tickets, o datalist fica vazio e a digitacao livre continua valendo.
+//
+// O que ja pertence a algum repositorio sai da lista: um modulo mora num lugar so, entao
+// oferece-lo de novo seria oferecer um movimento como se fosse uma adicao.
+function fillDatalist() {
+  const dl = $('cfgModulos');
+  const usados = new Set(cfgRepos.flatMap(r => r.modules || []));
+  dl.textContent = '';
+  for (const m of uniq('module')) if (!usados.has(m)) dl.appendChild(new Option(m));
+}
+
+function renderRepos() {
+  const box = $('cfgRepos');
+  fillDatalist();          // unico ponto por onde toda mudanca de modulo passa
+  box.textContent = '';
+  if (!cfgRepos.length) {
+    box.appendChild(el('p', 'repo-none', 'Nenhum repositório apontado.'));
+    return;
+  }
+  cfgRepos.forEach((r, i) => box.appendChild(repoRow(r, i)));
+}
+
+function repoRow(r, i) {
+  const row = el('div', 'repo');
+  row.dataset.i = i;
+
+  const inp = el('input', 'repo-input');
+  inp.type = 'text';
+  inp.value = r.path || '';
+  inp.spellcheck = false;
+  inp.placeholder = 'C:\dev\praxio\Autumn.SIGAi';
+  inp.setAttribute('aria-label', 'Caminho do repositório');
+
+  const pick = el('button', 'btn btn-ghost', 'Procurar…');
+  pick.type = 'button';               // dentro de <form method="dialog"> o default fecharia o dialog
+  pick.dataset.act = 'pick';
+
+  const del = el('button', 'btn btn-ghost btn-icon');
+  del.type = 'button';
+  del.dataset.act = 'del';
+  del.title = 'Remover repositório';
+  del.setAttribute('aria-label', 'Remover repositório');
+  del.appendChild(icon('i-close'));
+
+  const path = el('div', 'repo-path');
+  path.append(inp, pick, del);
+
+  const mods = el('div', 'repo-mods');
+  for (const m of r.modules || []) mods.appendChild(modChip(m));
+  const add = el('input', 'mod-input');
+  add.type = 'text';
+  add.setAttribute('list', 'cfgModulos');
+  add.placeholder = '+ módulo';
+  add.spellcheck = false;
+  add.autocomplete = 'off';
+  add.setAttribute('aria-label', 'Adicionar módulo');
+  mods.appendChild(add);
+
+  row.append(path, mods);
+  return row;
+}
+
+function modChip(m) {
+  const c = el('span', 'mchip');
+  c.appendChild(el('span', null, m));
+  const x = el('button', 'mchip-x');
+  x.type = 'button';
+  x.dataset.act = 'unmod';
+  x.dataset.m = m;
+  x.title = 'Remover ' + m;
+  x.setAttribute('aria-label', 'Remover ' + m);
+  x.appendChild(icon('i-close'));
+  c.appendChild(x);
+  return c;
+}
+
+// Le a tela, sem filtrar: o indice de cada linha tem que continuar batendo com o
+// data-i do DOM. Quem descarta caminho vazio e o ipc, na gravacao.
+const collectRepos = () => [...$('cfgRepos').querySelectorAll('.repo')].map(row => ({
+  path: row.querySelector('.repo-input').value.trim(),
+  modules: [...row.querySelectorAll('.mchip-x')].map(b => b.dataset.m)
+}));
+
+// Autosave: o rodape governa so a chave. Ninguem espera apertar Salvar numa lista de
+// repositorios, e salvar em lote junto com a chave faria o campo vazio derrubar tudo.
+function saveRepos() {
+  cfgRepos = collectRepos();
+  return window.api.setRepos(cfgRepos);
+}
+
+function addMod(input, refocus) {
+  const novos = normModules(input.value);
+  input.value = '';
+  if (!novos.length) return;
+  const i = +input.closest('.repo').dataset.i;
+  cfgRepos = collectRepos();
+  // Um modulo mora num repositorio so: entrar aqui e sair de onde estava. O movimento
+  // acontece na tela inteira, que esta toda visivel — nada some sem o usuario ver.
+  cfgRepos.forEach((r, j) => { if (j !== i) r.modules = r.modules.filter(m => !novos.includes(m)); });
+  cfgRepos[i].modules = normModules([...cfgRepos[i].modules, ...novos]);
+  renderRepos();
+  saveRepos();
+  if (!refocus) return;
+  const again = $('cfgRepos').querySelector('.repo[data-i="' + i + '"] .mod-input');
+  if (again) again.focus();
 }
 
 async function saveConfig() {
+  await saveRepos();   // pega a linha que o usuario editou e ainda nao largou
+
+  // Chave intocada: nada a revalidar, e refazer o fetch de ~3,5s seria cobrar por uma
+  // mudanca que nao houve. Campo apagado tambem conta como intocado — apagar sem querer
+  // nao pode derrubar a chave que ja funciona.
   const key = $('cfgKey').value.trim();
+  if (keySaved && (mascarado() || !key)) return $('cfg').close();
+
   const res = await window.api.setKey(key);
   if (res.error) {
     $('cfgError').textContent = res.error;
@@ -832,6 +985,7 @@ async function saveConfig() {
     $('cfgKey').focus();
     return;
   }
+  keySaved = true;
   $('cfg').close();
   clearNotice();
   load();
@@ -873,10 +1027,70 @@ $('dOrigin').addEventListener('change', e => {
 
 $('cfgForm').addEventListener('submit', e => { e.preventDefault(); saveConfig(); });
 $('cfgCancel').addEventListener('click', () => $('cfg').close());
+// Clicar no campo mascarado limpa para colar por cima; sair sem digitar nada devolve a
+// mascara, para o dialog nao passar a mentir que nao ha chave.
+$('cfgKey').addEventListener('focus', () => { if (mascarado()) desmascarar(); });
+$('cfgKey').addEventListener('blur', () => { if (keySaved && !$('cfgKey').value.trim()) mascarar(); });
+
 $('cfgKey').addEventListener('input', e => {
+  // O showModal() ja da foco a este campo antes da mascara chegar, entao o evento 'focus'
+  // nao dispara e digitar concatenaria com as bolinhas. Quem digita quer a chave nova.
+  if (e.target.value.includes('•')) e.target.value = e.target.value.replace(/•/g, '');
   const n = e.target.value.trim().length;
+  e.target.dataset.mask = '0';
   $('cfgCount').textContent = n + ' / 104';
+  // Com chave ja gravada o botao nunca bloqueia: o que ele confirma pode ser so os
+  // repositorios. Sem chave, nao ha o que salvar ate colarem alguma coisa.
+  $('cfgSave').disabled = !keySaved && n === 0;
+  // "e carregar" so aparece quando vai mesmo recarregar — chave nova completa.
+  $('cfgSave').textContent = n === 104 || !keySaved ? 'Salvar e carregar' : 'Salvar';
   if (n === 104) { $('cfgError').textContent = ''; $('cfgField').dataset.invalid = '0'; }
+});
+
+$('cfgAddRepo').addEventListener('click', () => {
+  cfgRepos = collectRepos();
+  cfgRepos.push({ path: '', modules: [] });
+  renderRepos();
+  const linhas = $('cfgRepos').querySelectorAll('.repo-input');
+  linhas[linhas.length - 1].focus();
+});
+
+// Delegado: as linhas sao remontadas a cada mudanca, entao listener por botao vazaria.
+$('cfgRepos').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const row = b.closest('.repo');
+  const i = +row.dataset.i;
+
+  if (b.dataset.act === 'del') {
+    cfgRepos = collectRepos();
+    cfgRepos.splice(i, 1);
+    renderRepos();
+    saveRepos();
+  } else if (b.dataset.act === 'unmod') {
+    cfgRepos = collectRepos();
+    cfgRepos[i].modules = cfgRepos[i].modules.filter(m => m !== b.dataset.m);
+    renderRepos();
+    saveRepos();
+  } else if (b.dataset.act === 'pick') {
+    const res = await window.api.pickDir();
+    if (!res.path) return;                 // cancelou: nada muda
+    row.querySelector('.repo-input').value = res.path;
+    saveRepos();
+  }
+});
+
+$('cfgRepos').addEventListener('keydown', e => {
+  if (!e.target.classList.contains('mod-input')) return;
+  if (e.key !== 'Enter' && e.key !== ',') return;
+  e.preventDefault();                      // Enter aqui submeteria o <form method="dialog">
+  addMod(e.target, true);
+});
+
+// Sair do campo tambem confirma: escolher no datalist e sair sem Enter e o caminho comum.
+$('cfgRepos').addEventListener('change', e => {
+  if (e.target.classList.contains('repo-input')) saveRepos();
+  else if (e.target.classList.contains('mod-input')) addMod(e.target, false);
 });
 
 const inDetail = () => !$('detailView').hidden;

@@ -37,7 +37,7 @@ ligado.
 
 ## Contrato do IPC
 
-Dez canais, todos definidos em `preload.js` e implementados em [`ipc/`](../ipc/CLAUDE.md).
+Treze canais, todos definidos em `preload.js` e implementados em [`ipc/`](../ipc/CLAUDE.md).
 
 | Canal | Entrada | Saída | Onde |
 | --- | --- | --- | --- |
@@ -45,6 +45,9 @@ Dez canais, todos definidos em `preload.js` e implementados em [`ipc/`](../ipc/C
 | `set-key` | `string` | `{ ok }` ou `{ error }` | `ipc/config.js` |
 | `claude-ok` | — | `boolean` | `ipc/config.js` |
 | `claude-allow` | — | `{ ok }` | `ipc/config.js` |
+| `get-repos` | — | `{ repos }` | `ipc/config.js` |
+| `set-repos` | `[{ path, modules }]` | `{ ok, repos }` ou `{ error }` | `ipc/config.js` |
+| `pick-dir` | — | `{ path }` ou `{}` | `ipc/config.js` |
 | `tickets` | — | `{ tickets }` ou `{ error }` | `ipc/tickets.js` |
 | `ticket-detail` | `ticketId` | `{ tramites }` ou `{ error }` | `ipc/tickets.js` |
 | `ticket-views` | `ticketId` | `{ views }` ou `{ error }` | `ipc/tickets.js` |

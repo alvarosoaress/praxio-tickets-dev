@@ -135,6 +135,77 @@ ficam fora da página e o HTML gerado ainda passa por `sanitize.js` antes do DOM
 Figuras de .docx sobrevivem porque o sanitizador aceita `<img>` com `data:image/…`
 (menos SVG, que carrega script).
 
+## Configurações
+
+Um dialog só, com duas seções: **a chave da API** e **os repositórios locais**. O botão da
+barra deixou de ser uma chave e virou faders — ele abre Configurações, das quais a chave é
+uma seção; manter o ícone antigo faria o botão mentir sobre o próprio conteúdo. Engrenagem
+foi descartada por medida, não por gosto: os ícones da barra renderizam a 14px, e os dentes
+de uma engrenagem viram mancha nesse tamanho. Traço reto casa com o `#i-thread` e o
+`#i-resumo` da mesma folha. O `#i-key` **fica** — os estados de "sem chave" e "chave
+rejeitada" continuam sendo sobre a chave especificamente.
+
+**Dois dialogs seriam dois botões na barra** para uma tela que tem quatro controles no
+total. As duas seções se separam por filete de 1px e pelo rótulo mono/caixa-alta — o mesmo
+registro do `.rs-k` do resumo e da faixa de metadados. Caixa em volta seria card dentro de
+card, proibido neste mundo.
+
+**A largura continua 470px.** Um caminho como `C:\dev\praxio\Autumn.SIGAi` ocupa ~190px em
+mono 12px; alargar o dialog para caber um caso que já cabe deixaria calha morta, que é
+exatamente o defeito que a regra da medida existe para evitar. A altura é que deixou de ser
+previsível — N repositórios — então o dialog virou coluna com corpo rolável, herdando o
+padrão do `#resumo`, teto em 640px.
+
+**Repositório é linha, não card:** separada por 1px, como os trâmites e as linhas da lista.
+Caminho em mono (é dado medido, não prosa), "Procurar…" e remover à direita. Os módulos
+abaixo, em chips no registro do `.meta .mod` — mono 11px, `letter-spacing .04em`. Eles
+**não** reusam o `.chip` dos anexos: lá a borda tracejada já significa "sem
+pré-visualização" e o hover pinta o ícone de azul, semântica que não é desta tela.
+
+**O campo de módulo é um `<input list>` com `<datalist>`.** Um controle nativo entrega
+autocomplete e digitação livre ao mesmo tempo — `<select multiple>` não aceita valor novo, e
+um combobox próprio seriam centenas de linhas para o mesmo resultado. As opções saem dos
+módulos da fila já carregada: não existe rota que os liste, e na primeira execução o
+datalist fica vazio sem impedir a digitação. Como o datalist completa o valor **inteiro** do
+campo, entra um módulo por vez — é imposição do controle, não escolha. O tracejado do campo
+vazio é o mesmo sentido que ele já tem no `.tr-img`: lugar a preencher.
+
+**Um módulo mora num repositório só**, e a lista obedece isso: o que já foi apontado **sai
+das opções**. Oferecer de novo um módulo já atribuído seria oferecer um movimento com cara de
+adição — e deixaria dois repositórios respondendo pelo mesmo módulo, sem nada na tela dizendo
+qual vale. Digitar à mão um módulo que está em outro repositório **move**, não duplica: ele
+sai de onde estava. Como o dialog mostra todos os repositórios de uma vez, a saída acontece à
+vista, e não é preciso avisar sobre algo que o usuário está vendo. Remover devolve o módulo
+às opções. A invariante é garantida de novo na gravação (`unicos()`, em `modulos.js`), porque
+o `config.json` não pode guardar uma contradição nem quando a tela erra.
+
+> O popup do `<datalist>` é chrome do browser e CSS não o alcança. Sem `color-scheme: dark`
+> ele abre **branco** sobre um app quase preto. O escopo fica no input, não no `:root`: lá
+> mexeria em scrollbar nativa, `<select>`, caret e autofill de uma vez.
+
+**Chave já gravada aparece como 104 bolinhas**, em `--text-faint`, com o contador trocado
+por "chave configurada". Campo vazio numa tela de configuração diz "não há nada aqui", que é
+mentira quando o app está lendo tickets — e obrigaria a recolar a chave só para mexer num
+repositório. As bolinhas **não são a chave**: ela nunca chega ao renderer (regra de ouro #1),
+`hasKey()` devolve só um booleano, e a máscara é gerada na própria tela. Clicar limpa o campo
+para colar por cima; sair sem digitar devolve a máscara, para o dialog não passar a mentir no
+sentido contrário.
+
+**O rodapé governa só a chave.** Os repositórios salvam a cada mudança, sozinhos, porque
+ninguém espera apertar Salvar numa lista. Por isso "Cancelar" virou **"Fechar"** — não há
+nada pendente para cancelar. O botão de confirmação muda de nome conforme o que vai mesmo
+acontecer: **"Salvar"** enquanto a chave está intocada, **"Salvar e carregar"** quando há uma
+chave nova de 104 caracteres, que é o único caso em que a lista recarrega. Ele só nasce
+desabilitado na primeira execução, quando não há chave nem repositório para guardar.
+
+Chave intocada — mascarada ou apagada sem querer — **não é regravada e não refaz o fetch**.
+Cobrar ~3,5s por uma mudança que não houve seria punir quem entrou para outra coisa, e um
+campo limpo por acidente não pode derrubar a chave que já funciona.
+
+**Caminho que não existe não é erro.** O repositório pode estar num drive desconectado ou
+ainda não clonado, e reprovar a lista inteira por causa de uma linha faria o autosave perder
+as linhas boas. Nada lê esses caminhos ainda — a relação existe para ser usada depois.
+
 ## Resumo do ticket
 
 Um botão na barra do detalhe entrega o ticket ao `claude` da máquina e devolve quatro

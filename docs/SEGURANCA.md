@@ -103,7 +103,7 @@ não carrega uma fonte, um script ou uma imagem da internet.
 ## 3. Superfície do processo
 
 - `contextIsolation` fica no padrão (ligado); `nodeIntegration` fica desligado.
-- `preload.js` expõe 7 funções nomeadas. O renderer não tem acesso a `ipcRenderer`, a
+- `preload.js` expõe 13 funções nomeadas. O renderer não tem acesso a `ipcRenderer`, a
   `require`, nem ao `fs`.
 - `setWindowOpenHandler` (`main.js`) nega toda abertura de janela e manda a URL para o
   browser do sistema. Link de ticket ou de trâmite nunca abre uma janela Electron.

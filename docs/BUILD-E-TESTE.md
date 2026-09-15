@@ -35,6 +35,8 @@ Sem framework: `node test.js` com `assert`. Cobre só o que quebra em silêncio.
 | `KEEP` / `NUKE` | Nada está nas duas listas; `img` não passa direto |
 | `kindOf` | Extensão → família, incluindo o caso "sem preview" |
 | `prettyXml` | Indentação, folha numa linha só, e **nenhum conteúdo perdido** |
+| `unicos` | Um módulo pertence a um repositório só: o primeiro fica com ele, e o caminho não se perde no caminho |
+| `normModules` | Caixa e duplicata não viram dois módulos; não-string vindo do IPC é descartado, nunca convertido; o teto segura a lista |
 
 O que **não** tem teste, de propósito: render de DOM, IPC, protocolo e conversão de
 arquivo. Esses são verificados abrindo o app — ver abaixo.

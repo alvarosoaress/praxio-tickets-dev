@@ -1,5 +1,5 @@
-// Config do app, em %APPDATA%\tickets\config.json: a chave da API e o consentimento
-// do resumo. Unico lugar que le e escreve esse arquivo.
+// Config do app, em %APPDATA%\tickets\config.json: a chave da API, o consentimento
+// do resumo e o mapa de repositorios locais. Unico lugar que le e escreve esse arquivo.
 const { app } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -19,4 +19,9 @@ const setApiKey = key => writeCfg({ ...readCfg(), apiKey: key });
 const claudeOk = () => Boolean(readCfg().claudeOk);
 const setClaudeOk = () => writeCfg({ ...readCfg(), claudeOk: true });
 
-module.exports = { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk };
+// Mapa [{ path, modules }] de repositorio local para modulos do portal. Quem valida a
+// forma e ipc/config.js; aqui so le e grava.
+const repos = () => { const r = readCfg().repos; return Array.isArray(r) ? r : []; };
+const setRepos = list => writeCfg({ ...readCfg(), repos: list });
+
+module.exports = { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos };

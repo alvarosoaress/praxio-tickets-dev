@@ -5,6 +5,7 @@ const { parseBR, minutesSince, ageLabel, ageBucket, statusKey, matches, prettyXm
 const { safeHref, KEEP, NUKE, PORTAL_BASE } = require('./sanitize.js');
 const { buildPrompt, parseResult, MAX_PROMPT_CHARS } = require('./services/claude.js');
 const { parseResumo } = require('./renderer.js');
+const { normModules, unicos, MAX_MODULES } = require('./modulos.js');
 
 // parser: o portal manda "DD/MM/YYYY HH:mm:ss", que new Date() le como MM/DD
 const d = parseBR('14/09/2026 15:59:55');
@@ -209,5 +210,31 @@ assert.strictEqual(cacheGet('939415', '14/09/2026 10:16:35'), null, 'cache e por
 assert.strictEqual(cacheGet('937919', null), null, 'sem lastUpdate nao ha invalidacao possivel');
 cachePut('000', null, D1);
 assert.strictEqual(cacheGet('000', null), null, 'e ticket sem lastUpdate nao entra no cache');
+
+// modulos: o usuario digita livre ("wtr, wcx") e o mesmo normalizador recebe o array vindo
+// do IPC, onde nada e confiavel. Caixa errada gravaria dois modulos para o mesmo codigo.
+assert.deepStrictEqual(normModules('wtr, wcx'), ['WTR', 'WCX']);
+assert.deepStrictEqual(normModules('WTR  wtr ,wtr;WTR'), ['WTR'], 'dedupe depois de normalizar a caixa');
+assert.deepStrictEqual(normModules(''), []);
+assert.deepStrictEqual(normModules(null), []);
+
+// vindo do renderer pelo IPC: nao-string e descartado, nunca convertido — String({})
+// gravaria "[object Object]" no config.json, que e o mesmo arquivo da chave da API
+assert.deepStrictEqual(normModules(['wce', 42, null, {}, ['x'], 'WCE']), ['WCE']);
+assert.deepStrictEqual(normModules({}), [], 'objeto solto nao vira lista');
+
+// teto: o config.json guarda a chave da API, entao nada entra sem limite
+assert.strictEqual(normModules(Array.from({ length: 200 }, (_, i) => 'M' + i)).length, MAX_MODULES);
+
+// um modulo mora num repositorio so: o primeiro fica com ele. Sem isto, apontar WTR para
+// um repo novo deixaria o antigo respondendo pelo mesmo modulo, e nada na tela diria qual
+// dos dois vale.
+const u = unicos([{ path: 'A', modules: ['wtr', 'wcx'] }, { path: 'B', modules: ['WCX', 'wce'] }]);
+assert.deepStrictEqual(u.map(r => r.modules), [['WTR', 'WCX'], ['WCE']]);
+assert.deepStrictEqual(unicos([{ path: 'A', modules: ['WTR'] }, { path: 'B', modules: ['WTR'] }])[1].modules, []);
+assert.deepStrictEqual(unicos([]), []);
+assert.deepStrictEqual(unicos(null), []);
+// o caminho nao pode ser perdido no caminho
+assert.strictEqual(unicos([{ path: 'A', modules: [] }])[0].path, 'A');
 
 console.log('ok');

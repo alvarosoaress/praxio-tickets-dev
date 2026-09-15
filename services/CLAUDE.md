@@ -6,7 +6,7 @@ de IPC. Quem faz a ponte é [`../ipc/`](../ipc/CLAUDE.md).
 
 | Arquivo        | Fala com                    | Nunca                                                    |
 | -------------- | --------------------------- | -------------------------------------------------------- |
-| `config.js`    | `%APPDATA%\tickets\config.json` | —                                                    |
+| `config.js`    | `%APPDATA%\tickets\config.json` | valida o que grava — quem valida é `ipc/`                                                    |
 | `portalapi.js` | `portalapi.188720391.xyz`   | conhece anexo/ticket como conceito — só rotas e bytes    |
 | `anexo.js`     | `xlsx` e `mammoth`          | toca a rede ou o disco; recebe `Buffer`, devolve texto/HTML |
 | `claude.js`    | o binário `claude` do PATH  | conhece `config.js` — ver abaixo                         |

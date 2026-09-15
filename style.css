@@ -883,6 +883,118 @@ select option { background: var(--surface-2); color: var(--text); }
 
 /* ---------- dialogo de configuracao ---------- */
 
+/* Duas secoes e N repositorios: a altura deixa de ser previsivel, entao o dialog vira
+   coluna com corpo rolavel — mesmo padrao do #resumo. O :not([open]) e obrigatorio:
+   sem ele o display:flex sobrepoe o display:none do UA e o dialog fica visivel fechado. */
+#cfg {
+  display: flex;
+  flex-direction: column;
+  max-height: min(640px, calc(100vh - 80px));
+  overflow: hidden;
+}
+
+#cfg:not([open]) { display: none; }
+
+#cfg form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#cfg .dlg-body { flex: 1; min-height: 0; overflow: auto; }
+
+/* O popup do <datalist> e chrome do browser e CSS nao o alcanca. Sem color-scheme ele
+   abre branco em cima de um app quase preto. Escopo no input de proposito: no :root
+   mexeria em scrollbar nativa, select, caret e autofill de uma vez. */
+#cfg input[list] { color-scheme: dark; }
+
+/* Filete de 1px separa as secoes. Caixa em volta seria card dentro de card. */
+.dlg-body h3 { padding-top: 17px; border-top: 1px solid var(--line); }
+.dlg-body h2 + h3 { margin-top: 14px; padding-top: 0; border-top: 0; }
+.dlg-body h3 + p { margin-bottom: 12px; }
+
+/* Linha de repositorio, nao card: separada por 1px como os tramites e as linhas da lista. */
+.repo { padding: 11px 0; border-top: 1px solid var(--line); }
+.repo:first-child { padding-top: 0; border-top: 0; }
+
+.repo-path { display: flex; align-items: center; gap: 6px; }
+
+.repo-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 11.5px/1 var(--mono);
+  outline: none;
+  user-select: text;
+  text-overflow: ellipsis;
+  transition: border-color .15s var(--ease);
+}
+
+.repo-input:focus { border-color: #4a5563; }
+.repo-input::placeholder { color: var(--text-faint); }
+
+.repo-mods { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 7px; }
+
+/* Codigo de modulo e dado medido: mesmo registro do .meta .mod da lista. Nao reusa
+   .chip — aquele e chip de arquivo, e la [data-preview="0"] ja significa "sem preview". */
+.mchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  padding: 0 3px 0 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: var(--surface-2);
+  font: 500 11px/1 var(--mono);
+  letter-spacing: .04em;
+  color: var(--text-dim);
+}
+
+.mchip-x {
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color .15s var(--ease), background .12s var(--ease);
+}
+
+.mchip-x svg { width: 11px; height: 11px; }
+.mchip-x:hover { color: var(--text); background: #262c35; }
+
+/* Tracejado = lugar vazio a preencher, o mesmo sentido que ele ja tem no .tr-img. */
+.mod-input {
+  width: 98px;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px dashed var(--line-2);
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font: 400 11px/1 var(--mono);
+  letter-spacing: .04em;
+  outline: none;
+  user-select: text;
+  transition: border-color .15s var(--ease);
+}
+
+.mod-input:focus { border-color: #4a5563; border-style: solid; }
+.mod-input::placeholder { color: var(--text-faint); letter-spacing: 0; }
+
+.repo-none { margin: 0 0 11px; font-size: 12.5px; color: var(--text-faint); }
+
+#cfgAddRepo { margin-top: 12px; }
+
+
 /* ---------- resumo do ticket ---------- */
 
 /* Mais largo que os dialogs de formulario: aqui o conteudo e prosa, e 470px daria
@@ -911,7 +1023,7 @@ select option { background: var(--surface-2); color: var(--text); }
 
 /* Mesmo registro dos rotulos da faixa de metadados: mono, caixa alta, discreto.
    O ar fica acima do rotulo, nao abaixo — o bloco e o rotulo lem juntos. */
-.rs-k {
+.rs-k, .dlg-body h3 {
   margin: 22px 0 7px;
   font: 400 10px/1 var(--mono);
   letter-spacing: .1em;
@@ -978,6 +1090,10 @@ dialog::backdrop { background: rgba(4, 5, 7, .74); }
 .field input:focus { border-color: #4a5563; }
 .field input::placeholder { color: var(--text-faint); }
 .field[data-invalid="1"] input { border-color: var(--danger); }
+
+/* Chave ja gravada: as bolinhas nao sao dado digitado, sao um carimbo de "existe".
+   Em --text-faint elas leem como inertes em vez de como texto que voce pos ali. */
+.field input[data-mask="1"] { color: var(--text-faint); }
 
 .counter {
   display: flex;

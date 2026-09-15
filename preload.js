@@ -10,5 +10,8 @@ contextBridge.exposeInMainWorld('api', {
   anexoText: id => ipcRenderer.invoke('anexo-text', id),
   claudeOk: () => ipcRenderer.invoke('claude-ok'),
   claudeAllow: () => ipcRenderer.invoke('claude-allow'),
-  resumo: (id, ticket, tramites, refazer) => ipcRenderer.invoke('resumo', { id, ticket, tramites, refazer })
+  resumo: (id, ticket, tramites, refazer) => ipcRenderer.invoke('resumo', { id, ticket, tramites, refazer }),
+  getRepos: () => ipcRenderer.invoke('get-repos'),
+  setRepos: list => ipcRenderer.invoke('set-repos', list),
+  pickDir: () => ipcRenderer.invoke('pick-dir')
 });

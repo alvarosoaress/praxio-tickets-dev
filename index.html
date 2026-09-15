@@ -29,6 +29,10 @@
     <g id="i-key" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="8" cy="12" r="3.5"/><path d="M11.5 12H21"/><path d="M17.5 12v3.5"/><path d="M20.5 12v2.5"/>
     </g>
+    <g id="i-settings" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+      <path d="M4 7.5h9.5"/><path d="M18.5 7.5H20"/><circle cx="16" cy="7.5" r="2.1"/>
+      <path d="M4 16.5h3.5"/><path d="M12.5 16.5H20"/><circle cx="10" cy="16.5" r="2.1"/>
+    </g>
     <g id="i-alert" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 4.5 2.8 20h18.4L12 4.5Z"/><path d="M12 10v4.5"/><path d="M12 17.4v.1"/>
     </g>
@@ -95,7 +99,7 @@
     <div class="bar-right">
       <span class="updated" id="updated"></span>
       <button class="btn" id="refresh"><svg viewBox="0 0 24 24"><use href="#i-refresh"/></svg><span id="refreshLabel">Atualizar</span></button>
-      <button class="btn btn-ghost btn-icon" id="settings" title="Chave da API" aria-label="Chave da API"><svg viewBox="0 0 24 24"><use href="#i-key"/></svg></button>
+      <button class="btn btn-ghost btn-icon" id="settings" title="Configurações" aria-label="Configurações"><svg viewBox="0 0 24 24"><use href="#i-settings"/></svg></button>
     </div>
     <div class="loadbar" id="loadbar" hidden></div>
   </header>
@@ -228,7 +232,9 @@
 <dialog id="cfg">
   <form method="dialog" id="cfgForm">
     <div class="dlg-body">
-      <h2>Chave da API</h2>
+      <h2>Configurações</h2>
+
+      <h3>Chave da API</h3>
       <p>O app lê os tickets de <code>portalapi.188720391.xyz</code>. Cole a chave de 104 caracteres — ela fica só nesta máquina.</p>
       <div class="field" id="cfgField">
         <label for="cfgKey">Authorization</label>
@@ -238,15 +244,22 @@
           <span id="cfgCount">0 / 104</span>
         </div>
       </div>
+
+      <h3>Repositórios</h3>
+      <p>Qual repositório local corresponde a cada módulo do portal. A relação fica só nesta máquina e salva sozinha — nada é lido do disco.</p>
+      <div id="cfgRepos"></div>
+      <button class="btn" type="button" id="cfgAddRepo">Adicionar repositório</button>
+      <datalist id="cfgModulos"></datalist>
     </div>
     <div class="dlg-foot">
-      <button class="btn" type="button" id="cfgCancel">Cancelar</button>
+      <button class="btn" type="button" id="cfgCancel">Fechar</button>
       <button class="btn btn-primary" type="submit" id="cfgSave">Salvar e carregar</button>
     </div>
   </form>
 </dialog>
 
 <script src="sanitize.js"></script>
+<script src="modulos.js"></script>
 <script src="renderer.js"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@ A fronteira com o renderer. Um arquivo por domínio, cada um exportando `registe
 
 | Arquivo      | Canais                                          |
 | ------------ | ----------------------------------------------- |
-| `config.js`  | `has-key`, `set-key`, `claude-ok`, `claude-allow` |
+| `config.js`  | `has-key`, `set-key`, `claude-ok`, `claude-allow`, `get-repos`, `set-repos`, `pick-dir` |
 | `tickets.js` | `tickets`, `ticket-detail`, `ticket-views`       |
 | `anexos.js`  | `anexo-text`, `anexo-html` + `registerProtocol()` |
 | `resumo.js`  | `resumo`                                         |
@@ -21,6 +21,11 @@ tem que acontecer **antes** do ready. Separar os dois não é estilo, é ordem o
 
 2. **Validação mora aqui.** Id de ticket e de anexo são checados com `/^\d+$/` na entrada
    do handler, antes de qualquer chamada. O `services/` confia em quem chama.
+
+   `set-repos` usa `normModules()` do [`../modulos.js`](../modulos.js) e **isso não é
+   exceção à regra**: a *decisão* de rejeitar continua aqui, o arquivo só guarda a
+   expressão — mesma relação que o `sanitize.js` tem com o renderer. Ele mora na raiz, e
+   não em `services/`, porque o `test.js` precisa importá-lo sem subir o Electron.
 
 3. **Erro da API sai verbatim.** `/scrape-custom` devolve `401 "Falha no login"` quando o
    **servidor** falha ao logar no portal. Traduzir status HTTP para mensagem própria faz o

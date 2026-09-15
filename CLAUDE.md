@@ -57,8 +57,9 @@ arquivo único, a doc dela mora em `docs/`.
 | `main.js`     | Só o arquivo principal: registra o scheme, liga os módulos de IPC, abre a janela. ~40 linhas                   |
 | `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`                            |
 | `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`                                           |
-| `preload.js`  | Ponte `contextBridge`. 10 funções, nada além disso                                                             |
+| `preload.js`  | Ponte `contextBridge`. 13 funções, nada além disso                                                             |
 | `renderer.js` | Toda a UI: lista, detalhe, filtros, visualizador de anexo, estados de erro                                     |
+| `modulos.js`  | `normModules()`: código de módulo do portal. Puro, como o `sanitize.js`                                        |
 | `sanitize.js` | Allowlist de HTML. Fronteira de confiança — ver regra #2                                                       |
 | `index.html`  | Markup + biblioteca de ícones SVG inline + CSP                                                                 |
 | `style.css`   | Tokens e componentes do mundo visual                                                                           |
@@ -148,6 +149,7 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Sintoma                                         | Onde investigar                                                                                                                         |
 | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Tela pede a chave toda vez que abre             | `config.json` não gravou. `services/config.js`, pasta `%APPDATA%\tickets`                                                |
+| Campo da chave abre com bolinhas                | É máscara gerada na tela, não a chave — ela nunca chega ao renderer. `hasKey()` só diz que existe uma. Clicar no campo limpa para colar outra |
 | "Chave rejeitada pela API" com chave certa      | A API compara só os primeiros 104 chars. Espaço colado junto passa; chave curta não                                                     |
 | "A API não conseguiu buscar os tickets"         | Erro do servidor, não seu. O login da própria API no portal falhou — ver `PORTAL_LOGIN`/`PORTAL_PASSWORD` no `.env` do `portal-scraper` |
 | Lista carrega mas a faixa de anexos não aparece | A faixa sai do `anexos` de cada trâmite (`anexosDe`), não de rota própria. Se os trâmites vieram sem `anexos`, faltou o `?anexos=1` |
@@ -163,6 +165,7 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Resumir devolve "Not logged in"                 | O CLI está instalado mas sem login. `claude /login` no terminal. Nunca é a chave da API do app |
 | Botão Resumir fica desabilitado                 | Ele só libera quando os trâmites chegam — é o que ele manda para o Claude (`openDetail`) |
 | Resumo não atualiza depois de um trâmite novo   | Esperado: o cache não se refaz sozinho. A faixa âmbar avisa e "Refazer" atualiza |
+| Repositórios somem ao reabrir o app             | `config.json` não gravou. Eles salvam sozinhos a cada mudança, não no botão Salvar — que governa só a chave |
 | Resumo some ao reabrir o app                    | `%APPDATA%	ickets
 esumos.json` não gravou. Apagar o arquivo é seguro — só perde cache |
 
