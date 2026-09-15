@@ -22,7 +22,7 @@ Authorization: yaS2Ksa…            ← a chave crua, nada antes dela
 
 A comparação é `authHeader.slice(0, 104) !== API_KEY` — **uma chave com lixo no fim passa**,
 desde que os 104 primeiros caracteres batam. Por isso o app valida o tamanho no momento de
-salvar (`main.js:34`): transforma um 403 misterioso futuro numa mensagem imediata.
+salvar (`ipc/config.js`): transforma um 403 misterioso futuro numa mensagem imediata.
 
 A chave vive em `%APPDATA%\tickets\config.json` e não aparece em nenhum arquivo versionado.
 
@@ -181,7 +181,7 @@ Content-Length: 116819
 
 ⚠️ **`Content-Disposition: attachment` vem do portal e é repassado.** Quem consome precisa
 neutralizar isso, senão o Chromium abre "Salvar como" em vez de renderizar. O app troca por
-`inline` no handler do protocolo (`main.js:152`). Ver [`ANEXOS.md`](ANEXOS.md).
+`inline` no handler do protocolo (`ipc/anexos.js`). Ver [`ANEXOS.md`](ANEXOS.md).
 
 ---
 

@@ -54,10 +54,10 @@ que a feature de anexos inteira foi desenvolvida, antes do deploy da API.
 TICKETS_API=http://localhost:3311 npm start
 ```
 
-Com a variável ligada (`main.js:6`), além de trocar a base da API:
+Com a variável ligada (`services/portalapi.js`), além de trocar a base da API:
 
 - o console do renderer sai no terminal **e** em `%APPDATA%\tickets\dev.log`
-  (`main.js:174`). Isso existe porque o `.exe` empacotado não tem console, e sem isso
+  (`services/devlog.js`). Isso existe porque o `.exe` empacotado não tem console, e sem isso
   violação de CSP e erro de protocolo somem em silêncio;
 - a variável não tem efeito no build: o `.exe` distribuído aponta para produção.
 

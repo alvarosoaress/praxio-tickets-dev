@@ -131,13 +131,13 @@ input { caret-color: var(--amber); }
 .btn-ghost:hover:not(:disabled) { background: var(--surface-2); border-color: var(--line-2); }
 
 .btn-primary {
-  background: var(--amber);
-  border-color: var(--amber);
-  color: #241701;
+  background: var(--text);
+  border-color: var(--text);
+  color: #0b0d11;
   font-weight: 600;
 }
 
-.btn-primary:hover:not(:disabled) { background: #ffc155; border-color: #ffc155; color: #241701; }
+.btn-primary:hover:not(:disabled) { background: #fff; border-color: #fff; color: #0b0d11; }
 
 .spin { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -526,6 +526,7 @@ select option { background: var(--surface-2); color: var(--text); }
 #viewer::backdrop { background: rgba(3, 4, 6, .82); }
 
 .viewer-bar {
+  position: relative;   /* ancora o loadbar do resumo */
   display: flex;
   align-items: center;
   gap: 10px;
@@ -881,6 +882,58 @@ select option { background: var(--surface-2); color: var(--text); }
 .state .btn { margin-top: 3px; }
 
 /* ---------- dialogo de configuracao ---------- */
+
+/* ---------- resumo do ticket ---------- */
+
+/* Mais largo que os dialogs de formulario: aqui o conteudo e prosa, e 470px daria
+   uma medida curta demais para quatro blocos de texto. */
+#resumo {
+  /* Largura vem da medida de leitura (~73ch), nao o contrario: um dialog mais largo
+     que a linha de texto deixa uma calha morta a direita. */
+  width: min(560px, calc(100vw - 48px));
+  max-height: min(680px, calc(100vh - 80px));
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+#resumo:not([open]) { display: none; }
+
+.resumo-body { flex: 1; min-height: 0; overflow: auto; padding: 16px 22px 22px; }
+
+/* A faixa de aviso do resumo e a mesma da lista. O visual base de .notice — ambar — ja
+   significa "o que voce esta vendo e velho", que e exatamente o caso aqui; so o kind
+   "down" (vermelho) troca, para falha ao refazer. */
+#resumo .notice { flex: none; }
+#resumo .state { flex: 1; min-height: 0; }
+
+/* Mesmo registro dos rotulos da faixa de metadados: mono, caixa alta, discreto.
+   O ar fica acima do rotulo, nao abaixo — o bloco e o rotulo lem juntos. */
+.rs-k {
+  margin: 22px 0 7px;
+  font: 400 10px/1 var(--mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.rs-k:first-child { margin-top: 0; }
+
+.rs-p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.62;
+  color: var(--text);
+  user-select: text;
+}
+
+/* Espera de ~20s: em vez de tela vazia, os quatro rotulos ja aparecem com reguas no
+   lugar do texto. Nada pisca — o unico movimento e o loadbar da barra. */
+.rs-skel { display: flex; flex-direction: column; gap: 7px; }
+.rs-skel span { height: 9px; border-radius: 2px; background: var(--surface-2); }
+.rs-skel span:last-child { width: 58%; }
 
 dialog {
   width: min(470px, calc(100vw - 48px));

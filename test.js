@@ -3,6 +3,8 @@
 const assert = require('assert');
 const { parseBR, minutesSince, ageLabel, ageBucket, statusKey, matches, prettyXml, kindOf } = require('./renderer.js');
 const { safeHref, KEEP, NUKE, PORTAL_BASE } = require('./sanitize.js');
+const { buildPrompt, parseResult, MAX_PROMPT_CHARS } = require('./services/claude.js');
+const { parseResumo } = require('./renderer.js');
 
 // parser: o portal manda "DD/MM/YYYY HH:mm:ss", que new Date() le como MM/DD
 const d = parseBR('14/09/2026 15:59:55');
@@ -121,5 +123,73 @@ assert.ok(!xml.includes('\n\n'), 'sem linhas em branco');
 assert.ok(prettyXml('<a>x</a>').includes('x'));
 assert.ok(prettyXml('<a><b/>solto</a>').includes('solto'), 'texto entre tags nao se perde');
 assert.strictEqual(prettyXml(''), '');
+
+// prompt do resumo: a API devolve os tramites do mais recente para o mais antigo, e um
+// resumo lido fora de ordem inverte causa e efeito sem dar erro nenhum
+const trs = [
+  { date: '03/01/2026 10:00', origin: 'operador', author: 'PAUL', content: 'terceiro' },
+  { date: '02/01/2026 10:00', origin: 'cliente', author: 'MARIA', content: 'segundo' },
+  { date: '01/01/2026 09:00', origin: 'cliente', author: 'MARIA', content: 'primeiro' }
+];
+const pr = buildPrompt({ number: '1218235', title: 'Erro na NF-e', client: 'ACME' }, trs);
+assert.ok(pr.indexOf('primeiro') < pr.indexOf('segundo'), 'tramite vai do mais antigo para o mais recente');
+assert.ok(pr.indexOf('segundo') < pr.indexOf('terceiro'));
+assert.ok(pr.includes('1218235') && pr.includes('ACME'), 'cabecalho leva numero e cliente');
+assert.ok(pr.includes('[03/01/2026 10:00] [operador] PAUL'), 'data, origem e autor de cada tramite');
+
+// contentHtml e HTML cru do portal: mandar isso e gastar token com markup e arriscar
+// injecao de instrucao dentro de tag
+const html = buildPrompt({}, [{ content: 'texto puro', contentHtml: '<b>marcado</b>' }]);
+assert.ok(html.includes('texto puro') && !html.includes('<b>'), 'usa content, nunca contentHtml');
+
+// nome de anexo e contexto ("segue o log em anexo"), mas so quando existe
+assert.ok(buildPrompt({}, [{ content: 'x', anexos: [{ name: 'erro.log' }] }]).includes('erro.log'));
+assert.ok(!buildPrompt({}, [{ content: 'x' }]).includes('Anexos:'));
+
+// ticket sem tramite nenhum nao pode quebrar nem mandar prompt vazio
+assert.ok(buildPrompt({ number: '1' }, []).includes('nenhum trâmite'));
+assert.ok(buildPrompt().length > 0, 'sem argumento nenhum ainda devolve texto');
+
+// teto: um ticket gigante nao pode estourar o stdin do CLI. Corta do mais antigo, porque
+// o comeco da historia e o que menos importa para "o que precisa de mim agora"
+const gordo = Array.from({ length: 40 }, (_, i) => ({ date: `0${1 + (i % 9)}/01/2026 10:00`, content: 'L'.repeat(5000) + ' n' + i }));
+const cortado = buildPrompt({ number: '9' }, gordo);
+assert.ok(cortado.length <= MAX_PROMPT_CHARS, 'respeita o teto de caracteres');
+assert.ok(cortado.includes('TICKET 9'), 'cabecalho sobrevive ao corte');
+assert.ok(cortado.includes(' n0'), 'o tramite mais recente e o que fica');
+assert.ok(/omitido/.test(cortado), 'avisa que cortou, em vez de mentir por omissao');
+
+// um unico tramite absurdo tambem nao pode furar o teto
+assert.ok(buildPrompt({}, [{ content: 'X'.repeat(200000) }]).length <= MAX_PROMPT_CHARS);
+
+// saida do CLI: is_error traz o motivo dentro de result ("Not logged in"), e e isso que o
+// usuario precisa ler — traduzir esconderia a causa
+assert.deepStrictEqual(parseResult(JSON.stringify({ result: '  resumo  ' })), { text: 'resumo' });
+assert.deepStrictEqual(parseResult(JSON.stringify({ result: 'Not logged in', is_error: true })), { error: 'Not logged in' });
+assert.ok(parseResult('nao e json').error, 'stdout quebrado vira error, nao excecao');
+assert.ok(parseResult('').error, 'stdout vazio vira error');
+assert.ok(parseResult(JSON.stringify({ result: '' })).error, 'resumo vazio e erro, nao sucesso silencioso');
+
+
+// leitura do resumo: o modelo escreve o rotulo sozinho na linha. O parser existe para dar
+// hierarquia visual, entao a regra que importa e nao engolir texto quando ele foge do formato
+const quatro = parseResumo('O QUE ESTÁ OCORRENDO@NF-e falha.@@ONDE@Faturamento.@@POR QUÊ@Hipótese: update.@@POSSÍVEL SOLUÇÃO@Ver log.'.split('@').join('\n'));
+assert.strictEqual(quatro.length, 4);
+assert.deepStrictEqual(quatro.map(b => b.k), ['O QUE ESTÁ OCORRENDO', 'ONDE', 'POR QUÊ', 'POSSÍVEL SOLUÇÃO']);
+assert.strictEqual(quatro[1].body, 'Faturamento.');
+
+// rotulo com dois-pontos e o desvio mais provavel do modelo
+assert.strictEqual(parseResumo('ONDE:@Tela X.'.split('@').join('\n'))[0].k, 'ONDE');
+
+// varias linhas sob o mesmo rotulo viram um paragrafo so
+assert.strictEqual(parseResumo('ONDE@linha um@linha dois'.split('@').join('\n'))[0].body, 'linha um linha dois');
+
+// texto antes de qualquer rotulo, e rotulo que o modelo inventou: nada pode sumir
+assert.strictEqual(parseResumo('preambulo solto@ONDE@aqui'.split('@').join('\n'))[0].body, 'preambulo solto');
+assert.ok(parseResumo('ONDE@x@RISCO@y'.split('@').join('\n'))[0].body.includes('RISCO'), 'rotulo desconhecido vira texto, nao some');
+
+assert.deepStrictEqual(parseResumo(''), []);
+assert.deepStrictEqual(parseResumo(null), []);
+
 
 console.log('ok');

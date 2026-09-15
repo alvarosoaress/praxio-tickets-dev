@@ -157,11 +157,15 @@ function showStateIn(id, kind, iconName, title, body, actionLabel, onAction) {
 }
 
 function showNotice(kind, text, actionLabel, onAction) {
-  const n = $('notice');
+  showNoticeIn('notice', kind, text, actionLabel, onAction);
+}
+
+function showNoticeIn(id, kind, text, actionLabel, onAction) {
+  const n = $(id);
   n.dataset.kind = kind;
   n.hidden = false;
-  $('noticeText').textContent = text;
-  const b = $('noticeAction');
+  n.querySelector('span').textContent = text;
+  const b = n.querySelector('button');
   b.hidden = !actionLabel;
   if (actionLabel) {
     b.textContent = actionLabel;
@@ -561,6 +565,7 @@ async function openDetail(t) {
   $('dScroll').scrollTop = 0;
   renderDetailHeader(t);
   $('back').focus();
+  $('dResumir').disabled = true;   // so libera quando os tramites chegam
 
   if (!id) {
     showStateIn('dState', 'error', 'i-alert', 'Ticket sem id', 'O portal não devolveu um link com id numérico para este ticket, então não dá para buscar os trâmites.');
@@ -586,6 +591,7 @@ async function openDetail(t) {
   }
 
   detail = res;
+  $('dResumir').disabled = false;
   renderTramites();
   renderViews();
 }
@@ -593,8 +599,124 @@ async function openDetail(t) {
 function closeDetail() {
   current = null;
   detail = null;
+  openResumo.token = null;
   $('detailView').hidden = true;
   $('listView').hidden = false;
+}
+
+/* ---------- resumo do ticket ---------- */
+
+const RESUMO_LABELS = ['O QUE ESTÁ OCORRENDO', 'ONDE', 'POR QUÊ', 'POSSÍVEL SOLUÇÃO'];
+
+// O modelo devolve o rotulo sozinho numa linha e a prosa embaixo. Se ele fugir do formato,
+// o texto orfao vira bloco sem rotulo: nada pode sumir da tela por causa do parser.
+function parseResumo(text) {
+  const out = [];
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const label = line.replace(/[:.]+$/, '').toUpperCase();
+    if (RESUMO_LABELS.includes(label)) { out.push({ k: label, body: '' }); continue; }
+    if (!out.length) { out.push({ k: '', body: line }); continue; }
+    const cur = out[out.length - 1];
+    cur.body += (cur.body ? ' ' : '') + line;
+  }
+  return out.filter(b => b.k || b.body);
+}
+
+function paintResumo(blocos) {
+  const body = $('resumoBody');
+  body.textContent = '';
+  for (const b of blocos) {
+    if (b.k) body.appendChild(el('h3', 'rs-k', b.k));
+    if (b.body) body.appendChild(el('p', 'rs-p', b.body));
+    if (b.skel) {
+      const sk = el('div', 'rs-skel');
+      sk.append(el('span'), el('span'));
+      body.appendChild(sk);
+    }
+  }
+  $('resumoState').hidden = true;
+  body.hidden = false;
+}
+
+function setResumindo(on) {
+  $('resumoLoadbar').hidden = !on;
+  $('resumoRedo').disabled = on;
+  $('dResumir').disabled = on;
+  $('dResumirLabel').textContent = on ? 'Resumindo…' : 'Resumir';
+}
+
+// Pede o aceite antes de qualquer chamada: o conteudo do ticket sai da maquina.
+async function pedirResumo() {
+  if (await window.api.claudeOk()) return openResumo(false);
+  $('claudeAsk').showModal();
+}
+
+async function openResumo(refazer) {
+  const t = current;
+  const id = t && ticketId(t);
+  if (!id) return;
+
+  const token = {};
+  openResumo.token = token;
+
+  $('resumoTitle').textContent = t.title || 'Sem título';
+  if (!$('resumo').open) $('resumo').showModal();
+
+  // Refazer sobre um resumo ja na tela mantem o texto antigo enquanto o novo nao chega:
+  // mesma regra da lista, um refresh que falha nunca esvazia o que ja estava visivel.
+  // O carimbo "resumido em" fica junto — texto velho com data em branco mente sobre a idade.
+  const tinhaTexto = Boolean($('resumoBody').querySelector('.rs-p'));
+  if (!tinhaTexto) {
+    $('resumoMeta').textContent = '';
+    paintResumo(RESUMO_LABELS.map(k => ({ k, skel: true })));
+  }
+  $('resumoNotice').hidden = true;
+  setResumindo(true);
+
+  const res = await window.api.resumo(id, t, (detail && detail.tramites) || [], Boolean(refazer));
+  if (openResumo.token !== token) return;   // usuario fechou ou abriu outro ticket
+  setResumindo(false);
+
+  if (res.error === 'NO_CONSENT') {
+    $('resumo').close();
+    $('claudeAsk').showModal();
+    return;
+  }
+  if (res.error) {
+    if (tinhaTexto) {
+      showNoticeIn('resumoNotice', 'down', 'Não foi possível refazer: ' + res.error + ' O resumo abaixo é o anterior.');
+      return;
+    }
+    $('resumoBody').hidden = true;
+    showStateIn('resumoState', 'error', 'i-alert', 'Não foi possível resumir', res.error, 'Tentar de novo', () => openResumo(true));
+    return;
+  }
+
+  paintResumo(parseResumo(res.text));
+  // Só o carimbo: o numero do ticket ja esta na barra do detalhe, logo acima.
+  $('resumoMeta').textContent = res.at ? 'resumido em ' + fmtQuando(res.at) : '';
+  // Desatualizado nao se conserta sozinho: a chamada custa, entao quem decide e o usuario.
+  if (res.stale) {
+    showNoticeIn('resumoNotice', 'stale', 'Este resumo é anterior ao último trâmite do ticket. Use Refazer para atualizar.');
+  }
+}
+
+// ISO do cache -> "10/09/2026 15:22", o mesmo formato que o portal usa no resto da tela.
+function fmtQuando(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function closeResumo() {
+  openResumo.token = null;
+  setResumindo(false);
+  $('resumoNotice').hidden = true;
+  $('resumoBody').textContent = '';   // senao o proximo ticket abre com o resumo do anterior
+  $('resumo').close();
 }
 
 /* ---------- carga ---------- */
@@ -701,6 +823,17 @@ for (const id of ['fResp', 'fClient', 'fStatus']) {
 $('back').addEventListener('click', closeDetail);
 $('viewerClose').addEventListener('click', closeViewer);
 $('viewer').addEventListener('close', closeViewer);   // Esc nativo do <dialog>
+$('dResumir').addEventListener('click', pedirResumo);
+$('resumoClose').addEventListener('click', closeResumo);
+$('resumo').addEventListener('close', closeResumo);
+$('resumoRedo').addEventListener('click', () => openResumo(true));
+$('claudeAskNo').addEventListener('click', () => $('claudeAsk').close());
+$('claudeAskForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('claudeAsk').close();
+  await window.api.claudeAllow();
+  openResumo(false);
+});
 $('dq').addEventListener('input', renderTramites);
 $('dOrigin').addEventListener('change', e => {
   e.target.dataset.active = e.target.value ? '1' : '0';
@@ -718,7 +851,7 @@ $('cfgKey').addEventListener('input', e => {
 const inDetail = () => !$('detailView').hidden;
 
 document.addEventListener('keydown', e => {
-  if ($('cfg').open || $('viewer').open) return;   // dialogs cuidam do proprio Esc
+  if ($('cfg').open || $('viewer').open || $('resumo').open || $('claudeAsk').open) return;   // dialogs cuidam do proprio Esc
   if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r')) {
     e.preventDefault();
     inDetail() ? (current && openDetail(current)) : load();
@@ -749,4 +882,4 @@ load();
 }
 
 if (typeof document !== 'undefined') wire();
-if (typeof module !== 'undefined') module.exports = { parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf };
+if (typeof module !== 'undefined') module.exports = { parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf, parseResumo };

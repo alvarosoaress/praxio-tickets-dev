@@ -40,21 +40,24 @@ Primeira execução pede a chave da API (104 caracteres), guardada em
 
 Para desenvolver contra uma API local: `TICKETS_API=http://localhost:3311 npm start`.
 Com essa variável ligada, o console do renderer também sai no terminal e em
-`%APPDATA%\tickets\dev.log` (`main.js:174`) — sem isso, erro de CSP e de protocolo some
+`%APPDATA%\tickets\dev.log` (`services/devlog.js`) — sem isso, erro de CSP e de protocolo some
 em silêncio. Ver [`docs/BUILD-E-TESTE.md`](docs/BUILD-E-TESTE.md).
 
 ---
 
 ## Estrutura
 
-Projeto plano: não há `src/`, e por isso ainda não existe doc co-locada. Se um dia surgir
-uma pasta com lógica própria, ela ganha um `CLAUDE.md` seu — enquanto for uma camada de
+O processo main é dividido em duas pastas, cada uma com o seu `CLAUDE.md`:
+[`services/`](services/CLAUDE.md) são os adaptadores do mundo externo, [`ipc/`](ipc/CLAUDE.md)
+é a fronteira com o renderer. O renderer continua plano — enquanto for uma camada de
 arquivo único, a doc dela mora em `docs/`.
 
 | Arquivo       | Papel                                                                                                          |
 | ------------- | -------------------------------------------------------------------------------------------------------------- |
-| `main.js`     | Processo privilegiado: janela, `config.json`, todo acesso à rede, protocolo `anexo://`, conversão de xlsx/docx |
-| `preload.js`  | Ponte `contextBridge`. 7 funções, nada além disso                                                              |
+| `main.js`     | Só o arquivo principal: registra o scheme, liga os módulos de IPC, abre a janela. ~40 linhas                   |
+| `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`                            |
+| `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`                                           |
+| `preload.js`  | Ponte `contextBridge`. 10 funções, nada além disso                                                             |
 | `renderer.js` | Toda a UI: lista, detalhe, filtros, visualizador de anexo, estados de erro                                     |
 | `sanitize.js` | Allowlist de HTML. Fronteira de confiança — ver regra #2                                                       |
 | `index.html`  | Markup + biblioteca de ícones SVG inline + CSP                                                                 |
@@ -67,6 +70,9 @@ arquivo único, a doc dela mora em `docs/`.
 renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ──sessão──▶  portal Praxio
 (sem rede,          (tem a chave,           (tem o login,
  sem chave)          tem as libs)            faz scraping)
+                      │
+                      └──stdin──▶  claude CLI  ──▶  Anthropic
+                                   (login do usuário, não do app)
 ```
 
 ---
@@ -74,8 +80,8 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 ## Regras de ouro
 
 1. **Rede só no main.** O renderer nunca faz `fetch` para fora. A chave da API não entra
-   na memória do renderer nem no devtools. Toda leitura passa por `get()` (`main.js:42`)
-   ou `anexoBytes()` (`main.js:81`).
+   na memória do renderer nem no devtools. Toda leitura passa por `get()`
+   ou `anexoBytes()` (`services/portalapi.js`).
 
 2. **Todo HTML vindo do portal passa por `sanitizeHtml()`.** Isso inclui a saída do
    SheetJS e do mammoth — não é "conteúdo nosso", é um arquivo que um cliente enviou.
@@ -126,7 +132,12 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 12. **Data do portal não é parseável por `new Date()`.** Vem `DD/MM/YYYY HH:mm:ss`, que o
     JS lê como mês/dia. Sempre `parseBR()` (`renderer.js:33`).
 
-13. **Dependência nova precisa de justificativa escrita.** Hoje são duas, ambas porque
+13. **Conteúdo de ticket só sai da máquina com aceite explícito.** O resumo entrega
+    título, cliente e o texto dos trâmites ao `claude` do PATH. Sem `claudeOk` no
+    `config.json`, `ipc/resumo.js` devolve `NO_CONSENT` e **nada é enviado**. O aceite é
+    pedido uma vez, com o que sai escrito por extenso — não numa nota de rodapé.
+
+14. **Dependência nova precisa de justificativa escrita.** Hoje são duas, ambas porque
     converter `.xlsx`/`.docx` à mão não é viável. Spinner, toast, date-lib e afins não
     entram.
 
@@ -136,17 +147,22 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 
 | Sintoma                                         | Onde investigar                                                                                                                         |
 | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Tela pede a chave toda vez que abre             | `config.json` não gravou. `readCfg`/`writeCfg` (`main.js:29`), pasta `%APPDATA%\tickets`                                                |
+| Tela pede a chave toda vez que abre             | `config.json` não gravou. `services/config.js`, pasta `%APPDATA%\tickets`                                                |
 | "Chave rejeitada pela API" com chave certa      | A API compara só os primeiros 104 chars. Espaço colado junto passa; chave curta não                                                     |
 | "A API não conseguiu buscar os tickets"         | Erro do servidor, não seu. O login da própria API no portal falhou — ver `PORTAL_LOGIN`/`PORTAL_PASSWORD` no `.env` do `portal-scraper` |
 | Lista carrega mas a faixa de anexos não aparece | `/anexos/:ticketId` falhou. O app esconde a faixa em vez de mostrar erro — anexo é acessório. Conferir a rota com `curl` |
-| Anexos não aparecem dentro dos trâmites         | Falta o `?anexos=1` na chamada (`main.js:66`), ou a API apontada é anterior a essa rota |
-| PDF abre "Salvar como" em vez de renderizar     | `Content-Disposition: attachment` vazando do portal. O handler força `inline` (`main.js:152`)                                           |
+| Anexos não aparecem dentro dos trâmites         | Falta o `?anexos=1` na chamada (`ipc/tickets.js`), ou a API apontada é anterior a essa rota |
+| PDF abre "Salvar como" em vez de renderizar     | `Content-Disposition: attachment` vazando do portal. O handler força `inline` (`ipc/anexos.js`)                                           |
 | Imagem do anexo vira ícone quebrado             | Id foi para o _host_ do `anexo://` em vez do path — host numérico vira IPv4 decimal                                                     |
 | `fetch('anexo://…')` falha no renderer          | CORS. Texto/planilha/docx vão por IPC; só `<img>`/`<video>`/`<iframe>` usam a URL                                                       |
 | Estilo aplicado por JS não pega                 | CSP `style-src`. O zoom da imagem escreve `transform` inline                                                                            |
-| Acento vira losango em `.sql`/`.txt`            | Arquivo em cp1252. `anexo-text` detecta `U+FFFD` e refaz em latin1 (`main.js:99`) |
+| Acento vira losango em `.sql`/`.txt`            | Arquivo em cp1252. `anexo-text` detecta `U+FFFD` e refaz em latin1 (`services/anexo.js`) |
 | Ticket abre sem trâmites, com "Ticket sem id"   | O `link` do portal veio sem `/TicketPrincipal/<id>`; `ticketId()` (`renderer.js:105`)                                                   |
+| "Claude CLI não encontrado"                     | O `claude` não está no PATH **do processo Electron**. O `.exe` não embute o CLI — cada máquina precisa do Claude Code instalado |
+| Resumir devolve "Not logged in"                 | O CLI está instalado mas sem login. `claude /login` no terminal. Nunca é a chave da API do app |
+| Botão Resumir fica desabilitado                 | Ele só libera quando os trâmites chegam — é o que ele manda para o Claude (`openDetail`) |
+| Resumo não atualiza depois de um trâmite novo   | Esperado: o cache não se refaz sozinho. A faixa âmbar avisa e "Refazer" atualiza |
+| Resumo some ao reabrir o app                    | `%APPDATA%	icketsesumos.json` não gravou. Apagar o arquivo é seguro — só perde cache |
 
 ---
 
@@ -162,6 +178,8 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 - **Gravar anexo em disco.** Todo o pipeline é em memória/stream por decisão de produto:
   "pré-visualização sem precisar baixar nada".
 - **Hardcodar a chave da API** em qualquer arquivo versionado.
+- **Mandar conteúdo de ticket para qualquer serviço externo sem o gate de consentimento.**
+  Hoje o único destino é o `claude` CLI, e ele passa por `claudeOk`.
 - **Subir a versão ou publicar o `.exe`** para outras máquinas.
 
 ---

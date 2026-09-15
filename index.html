@@ -56,6 +56,9 @@
     <g id="i-close" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
       <path d="M6 6l12 12"/><path d="M18 6 6 18"/>
     </g>
+    <g id="i-resumo" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4.2 5.6v12.8"/><path d="M8.8 7h11"/><path d="M8.8 12h11"/><path d="M8.8 17h6.6"/>
+    </g>
     <!-- icones de tipo de arquivo: mesma folha, mesmo traco -->
     <g id="f-image" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
       <rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4.5 17 4.8-4.4 3.4 3 3-2.4 3.8 3.4"/>
@@ -133,6 +136,7 @@
     </div>
     <div class="bar-right">
       <span class="updated" id="dAge"></span>
+      <button class="btn" id="dResumir" title="Resumir o ticket com o Claude"><svg viewBox="0 0 24 24"><use href="#i-resumo"/></svg><span id="dResumirLabel">Resumir</span></button>
       <a class="btn" id="dPortal" target="_blank" rel="noreferrer"><svg viewBox="0 0 24 24"><use href="#i-external"/></svg>Abrir no portal</a>
     </div>
     <div class="loadbar" id="dLoadbar" hidden></div>
@@ -186,6 +190,39 @@
     <button class="btn btn-ghost btn-icon" id="viewerClose" title="Fechar (Esc)" aria-label="Fechar"><svg viewBox="0 0 24 24"><use href="#i-close"/></svg></button>
   </header>
   <div class="viewer-body" id="viewerBody"></div>
+</dialog>
+
+<dialog id="resumo">
+  <header class="viewer-bar">
+    <svg class="viewer-icon" viewBox="0 0 24 24"><use href="#i-resumo"/></svg>
+    <span class="viewer-name" id="resumoTitle"></span>
+    <span class="viewer-meta" id="resumoMeta"></span>
+    <span class="spacer"></span>
+    <button class="btn btn-ghost" id="resumoRedo" title="Gerar de novo"><svg viewBox="0 0 24 24"><use href="#i-refresh"/></svg>Refazer</button>
+    <button class="btn btn-ghost btn-icon" id="resumoClose" title="Fechar (Esc)" aria-label="Fechar" autofocus><svg viewBox="0 0 24 24"><use href="#i-close"/></svg></button>
+    <div class="loadbar" id="resumoLoadbar" hidden></div>
+  </header>
+  <div class="notice" id="resumoNotice" hidden>
+    <svg viewBox="0 0 24 24"><use href="#i-alert"/></svg>
+    <span></span>
+    <button class="btn" hidden></button>
+  </div>
+  <div class="resumo-body" id="resumoBody"></div>
+  <div class="state" id="resumoState" hidden></div>
+</dialog>
+
+<dialog id="claudeAsk">
+  <form method="dialog" id="claudeAskForm">
+    <div class="dlg-body">
+      <h2>Resumir com o Claude</h2>
+      <p>Para montar o resumo, o app entrega o ticket ao <code>claude</code> instalado nesta máquina: título, cliente e o texto de todos os trâmites. Esse conteúdo sai do seu computador e vai para a Anthropic pela sua conta do Claude Code, como em qualquer conversa sua com o Claude.</p>
+      <p>O resumo é guardado nesta máquina, em <code>%APPDATA%\tickets\resumos.json</code>, para não refazer a chamada toda vez que você abrir o ticket. Ele se refaz sozinho quando o ticket recebe um trâmite novo. Você só precisa autorizar uma vez.</p>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" type="button" id="claudeAskNo">Agora não</button>
+      <button class="btn btn-primary" type="submit" id="claudeAskYes">Autorizar e resumir</button>
+    </div>
+  </form>
 </dialog>
 
 <dialog id="cfg">

@@ -60,7 +60,7 @@ escondido atrás de scroll horizontal simplesmente desaparece.
 
 ### 1. O id vai no path, nunca no host
 
-O protocolo é registrado como `standard` (`main.js:23`), o que é necessário para
+O protocolo é registrado como `standard` (`main.js`), o que é necessário para
 `supportFetchAPI` e `stream`. Efeito colateral: o parser de URL trata o host como possível
 IPv4 em notação decimal.
 
@@ -78,8 +78,8 @@ O portal marca **todo** anexo como `attachment`. A rota `/anexo/:id` repassa o h
 app repassar de novo para o Chromium, um PDF em `<iframe>` abre o diálogo "Salvar como" em
 vez de renderizar — exatamente o oposto do que a feature existe para fazer.
 
-O handler força `inline` (`main.js:152`) e, quando o portal responde `application/octet-stream`,
-completa o tipo a partir da extensão (`?ext=pdf` → tabela `MIME` em `main.js:12`).
+O handler força `inline` (`ipc/anexos.js`) e, quando o portal responde `application/octet-stream`,
+completa o tipo a partir da extensão (`?ext=pdf` → tabela `MIME` em `services/anexo.js`).
 
 Imagens não sofriam com isso — `<img>` ignora `Content-Disposition` —, então o bug só
 apareceu ao testar PDF. Lição: testar **um formato de cada família de elemento**
@@ -100,14 +100,14 @@ carrega `Access-Control-Allow-Origin`.
 
 ## Conversão de planilha e `.docx`
 
-Acontece no **processo main** (`main.js:112`), não no renderer. Três motivos:
+Acontece no **processo main** (`ipc/anexos.js`), não no renderer. Três motivos:
 
 1. As bibliotecas ficam fora da página — nada a acrescentar à CSP, nada a servir local.
 2. O renderer não precisa dos bytes, só do HTML pronto.
 3. O HTML gerado ainda passa por `sanitizeHtml()` antes de entrar no DOM. SheetJS e mammoth
    são confiáveis; **o arquivo que eles leram não é**.
 
-Teto de 25 MB (`MAX_CONVERT_BYTES`, `main.js:9`): a conversão é em memória e existe `.zip`
+Teto de 25 MB (`MAX_CONVERT_BYTES`, `services/anexo.js`): a conversão é em memória e existe `.zip`
 de 16 MB na base. Acima disso, a UI diz que o arquivo é grande demais em vez de travar.
 
 Figuras de `.docx` sobrevivem porque o mammoth as entrega como `data:image/…` e o
@@ -142,7 +142,7 @@ se perde na formatação.
 
 ### Encoding de texto
 
-Decodifica como UTF-8; se aparecer `U+FFFD`, refaz em latin1 (`main.js:99`). Muito `.sql` e
+Decodifica como UTF-8; se aparecer `U+FFFD`, refaz em latin1 (`services/anexo.js`). Muito `.sql` e
 `.txt` da base vem em cp1252, e sem isso todo acento vira losango.
 
 ---

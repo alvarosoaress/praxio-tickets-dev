@@ -37,17 +37,37 @@ ligado.
 
 ## Contrato do IPC
 
-Sete canais, todos definidos em `preload.js` e implementados em `main.js`.
+Dez canais, todos definidos em `preload.js` e implementados em [`ipc/`](../ipc/CLAUDE.md).
 
 | Canal | Entrada | Saída | Onde |
 | --- | --- | --- | --- |
-| `has-key` | — | `boolean` | `main.js:32` |
-| `set-key` | `string` | `{ ok }` ou `{ error }` | `main.js:34` |
-| `tickets` | — | `{ tickets }` ou `{ error }` | `main.js:58` |
-| `ticket-detail` | `ticketId` | `{ tramites, views }` ou `{ error }` | `main.js:63` |
-| `anexos` | `ticketId` | `{ anexos }` ou `{ error }` | `main.js:74` |
-| `anexo-text` | `anexoId` | `{ text }` ou `{ error }` | `main.js:99` |
-| `anexo-html` | `{ id, kind }` | `{ sheets }` ou `{ error }` | `main.js:112` |
+| `has-key` | — | `boolean` | `ipc/config.js` |
+| `set-key` | `string` | `{ ok }` ou `{ error }` | `ipc/config.js` |
+| `claude-ok` | — | `boolean` | `ipc/config.js` |
+| `claude-allow` | — | `{ ok }` | `ipc/config.js` |
+| `tickets` | — | `{ tickets }` ou `{ error }` | `ipc/tickets.js` |
+| `ticket-detail` | `ticketId` | `{ tramites, views }` ou `{ error }` | `ipc/tickets.js` |
+| `anexos` | `ticketId` | `{ anexos }` ou `{ error }` | `ipc/anexos.js` |
+| `anexo-text` | `anexoId` | `{ text }` ou `{ error }` | `ipc/anexos.js` |
+| `anexo-html` | `{ id, kind }` | `{ sheets }` ou `{ error }` | `ipc/anexos.js` |
+| `resumo` | `{ id, ticket, tramites, refazer }` | `{ text, cached? }` ou `{ error }` | `ipc/resumo.js` |
+
+### Como o processo main é dividido
+
+`main.js` é só o arquivo principal: registra o scheme `anexo`, chama o `register()` de cada
+módulo de IPC e abre a janela. Abaixo dele, duas camadas com direção de dependência única —
+`ipc/` importa `services/`, nunca o contrário:
+
+```
+main.js
+  ├─ ipc/        fronteira com o renderer: valida entrada, monta { dados } | { error }
+  └─ services/   adaptadores do mundo externo: config, portalapi, anexo, claude, devlog
+```
+
+Duas ordens são obrigatórias e não são estilo: `registerSchemesAsPrivileged` fica em
+`main.js` no escopo de módulo (tem que rodar **antes** do `whenReady`), enquanto
+`registerProtocol()` de `ipc/anexos.js` roda **dentro** dele. E nenhum módulo pode chamar
+`app.getPath` na carga — ele lança antes do ready, e `main.js` requer todos no topo.
 
 ### Regra única: nunca lançar através do IPC
 
@@ -62,7 +82,7 @@ if (res.error) return onError(res.error, res.status);
 Se um handler lançasse, cada chamada na UI precisaria de `try/catch` próprio, e um erro
 esquecido viraria uma promise rejeitada silenciosa no meio do render.
 
-`get()` (`main.js:42`) concentra o padrão: converte timeout, falha de rede e status HTTP
+`get()` (`services/portalapi.js`) concentra o padrão: converte timeout, falha de rede e status HTTP
 não-ok todos para a mesma forma `{ error, status }`.
 
 ### Timeouts
@@ -109,7 +129,7 @@ ticket. O visualizador de anexo usa a mesma ideia com um token (`openViewer.toke
 lá pode haver duas conversões em voo.
 
 **Visualizações são acessórias.** Se `/visualizacoes` falhar, o main devolve `views: []` e
-o ticket abre assim mesmo (`main.js:63`). Só os trâmites são obrigatórios.
+o ticket abre assim mesmo (`ipc/tickets.js`). Só os trâmites são obrigatórios.
 
 ---
 
@@ -170,4 +190,4 @@ do próprio `Esc`.
   coluna exigiria comparar datas, e hoje só a idade é convertida.
 - **Sem paginação.** A API devolve o conjunto inteiro; a UI renderiza tudo. Com centenas de
   tickets isso vira um DOM grande de uma vez.
-- **`customSearchMenu` fixo em `27662`** (`main.js:7`). Trocar de fila é editar o código.
+- **`customSearchMenu` fixo em `27662`** (`services/portalapi.js`). Trocar de fila é editar o código.
