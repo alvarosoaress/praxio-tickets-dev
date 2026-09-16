@@ -16,8 +16,16 @@ const apiKey = () => readCfg().apiKey || '';
 const setApiKey = key => writeCfg({ ...readCfg(), apiKey: key });
 
 // O resumo manda o conteudo do ticket para fora da maquina; o usuario autoriza uma vez.
-const claudeOk = () => Boolean(readCfg().claudeOk);
-const setClaudeOk = () => writeCfg({ ...readCfg(), claudeOk: true });
+//
+// O aceite e versionado porque ele descreve por extenso O QUE sai (regra de ouro #13).
+// Quando isso muda de categoria, o aceite antigo deixou de cobrir o que acontece agora e
+// tem que ser pedido de novo — o valor velho (`true`) simplesmente nao casa.
+//   v2: alem do texto dos tramites, o resumo passou a mandar as imagens anexadas.
+//   v3: o resumo passou a mandar tambem os .md da raiz do repositorio do modulo. Categoria
+//       nova: ate aqui so saia conteudo do ticket; agora sai documentacao interna do codigo.
+const CONSENT_V = 3;
+const claudeOk = () => readCfg().claudeOk === CONSENT_V;
+const setClaudeOk = () => writeCfg({ ...readCfg(), claudeOk: CONSENT_V });
 
 // Mapa [{ path, modules }] de repositorio local para modulos do portal. Quem valida a
 // forma e ipc/config.js; aqui so le e grava.

@@ -154,6 +154,39 @@ objeto cacheado mesmo que o usuário já tenha voltado para a lista.
 
 ---
 
+## Fluxo da hotfix
+
+Sai do `#resumo` e termina num terminal fora do app. Duas chamadas, porque há uma pergunta
+no meio.
+
+1. `pedirHotfix()` (`renderer.js`) → canal `hotfix-probe` com `{ id, ticket }`.
+2. `ipc/hotfix.js` resolve o repositório: `repoDe(repos(), ticket.module)` contra
+   `config.repos`. **O renderer nunca manda caminho** — mesmo espírito da regra de ouro #9.
+3. `git.probe()` roda quatro comandos de leitura, nesta ordem:
+   `git flow version` (instalado?) → `git rev-parse --absolute-git-dir` (é repo?) →
+   `git config --get gitflow.branch.develop` (inicializado?) → `git status --porcelain`.
+4. Impedimento volta como código (`NO_GITFLOW`, `NO_REPO`, …) e abre o `#hotfixAsk`.
+   Workspace sujo volta como `dirty: N` e abre o mesmo dialog, agora com confirmação.
+   Workspace limpo pula o dialog e vai direto para o passo 5.
+5. Canal `hotfix-start`, que **reroda os mesmos checks** e então executa:
+   `git add -A` + `git stash push -m …` (se sujo) → `git checkout <develop>` →
+   `git pull --ff-only` → `git flow hotfix start <slug>`.
+6. Escreve `TICKET-<slug>.md` no repo, acrescenta o nome ao `.git/info/exclude`, e chama
+   `abrirNoTerminal()` (`services/claude.js`), que dá `spawn` em `wt` com fallback para
+   `cmd`.
+
+### As três decisões que custaram medição
+
+- **`git flow version` responde 0 fora de um repositório.** Ele só prova instalação. O que
+  prova inicialização é `gitflow.branch.develop` — e sem esse check o `hotfix start` para
+  num prompt interativo que, sem TTY, trava o processo main até o timeout de 60s.
+- **O stash vem antes do `checkout`.** Checkout com tree sujo ou falha, ou carrega as
+  mudanças para a develop. Por isso todo erro a partir daí devolve o nome do stash: depois
+  que ele existe, um erro que não o cita faz o usuário achar que perdeu o trabalho.
+- **O gitflow AVH não diz "already exists"** quando já há uma hotfix aberta, e sim "There is
+  an existing hotfix branch" — ele só admite uma por vez. `jaExiste()` cobre as duas formas;
+  sem isso, o segundo clique no mesmo ticket falha e larga o usuário na develop.
+
 ## Estados da UI
 
 Onde o estado aparece depende de já haver conteúdo na tela — é a regra #4 em forma de

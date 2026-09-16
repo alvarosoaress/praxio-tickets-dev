@@ -1063,6 +1063,9 @@ dialog::backdrop { background: rgba(4, 5, 7, .74); }
 .dlg-body h2 { margin: 0 0 6px; font: 600 15px/1.3 var(--sans); }
 .dlg-body p { margin: 0 0 16px; font-size: 12.5px; color: var(--text-dim); }
 .dlg-body p code { font: 400 11.5px/1.4 var(--mono); color: var(--text-faint); user-select: text; }
+/* 500 como no .tr-body b — 700 neste corpo vira mancha. O que marca a enfase e a cor
+   subir para --text: peso maior num texto que continua --text-dim so pesa, nao destaca. */
+.dlg-body p b { font-weight: 500; color: var(--text); }
 
 .field label {
   display: block;

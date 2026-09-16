@@ -679,6 +679,8 @@ function setResumindo(on) {
   $('resumoRedo').disabled = on;
   $('dResumir').disabled = on;
   $('dResumirLabel').textContent = on ? 'Resumindo…' : 'Resumir';
+  // A hotfix leva o texto do resumo junto; enquanto ele nao existe nao ha o que levar.
+  if (on) $('resumoHotfix').disabled = true;
 }
 
 // Pede o aceite antes de qualquer chamada: o conteudo do ticket sai da maquina.
@@ -721,6 +723,7 @@ async function openResumo(refazer) {
   if (res.error) {
     if (tinhaTexto) {
       showNoticeIn('resumoNotice', 'down', 'Não foi possível refazer: ' + res.error + ' O resumo abaixo é o anterior.');
+      $('resumoHotfix').disabled = false;   // o resumo anterior continua valendo como briefing
       return;
     }
     $('resumoBody').hidden = true;
@@ -729,6 +732,7 @@ async function openResumo(refazer) {
   }
 
   paintResumo(parseResumo(res.text));
+  $('resumoHotfix').disabled = false;
   // Só o carimbo: o numero do ticket ja esta na barra do detalhe, logo acima.
   $('resumoMeta').textContent = res.at ? 'resumido em ' + fmtQuando(res.at) : '';
   // Desatualizado nao se conserta sozinho: a chamada custa, entao quem decide e o usuario.
@@ -750,7 +754,101 @@ function closeResumo() {
   setResumindo(false);
   $('resumoNotice').hidden = true;
   $('resumoBody').textContent = '';   // senao o proximo ticket abre com o resumo do anterior
+  $('resumoHotfix').disabled = true;
   $('resumo').close();
+}
+
+/* ---------- hotfix a partir do resumo ---------- */
+
+// Codigos que o main devolve quando a hotfix nem chegou a comecar. Erro de git no meio da
+// sequencia nao esta aqui de proposito: ele vem como texto do proprio git e vai para a
+// faixa, nao para um dialog.
+const HOTFIX_CODIGOS = new Set(['NO_RESUMO', 'NO_SLUG', 'NO_REPO', 'NO_DIR', 'NO_GIT', 'NO_GITFLOW', 'NO_GITFLOW_INIT']);
+
+// Cada um destes tem um conserto diferente. Um "não foi possível criar a hotfix" para todos
+// faria o usuario adivinhar qual — a mesma razao da regra de ouro #5.
+function hotfixErro(res) {
+  switch (res.error) {
+    case 'NO_RESUMO': return ['Sem resumo para levar',
+      'A hotfix entrega o resumo do ticket ao Claude, e este ticket ainda não tem um. Gere o resumo primeiro.'];
+    case 'NO_SLUG': return ['Ticket sem número utilizável',
+      'O portal não devolveu para este ticket um número que sirva de nome de branch.'];
+    case 'NO_REPO': return [`Nenhum repositório para o módulo ${res.module || '—'}`,
+      'Abra Configurações → Repositórios e aponte a pasta local que responde por esse módulo.'];
+    case 'NO_DIR': return ['A pasta do repositório não existe',
+      'O caminho apontado em Configurações não está acessível: drive desconectado, ou o repositório ainda não foi clonado.', res.repo];
+    case 'NO_GIT': return ['Isso não é um repositório git',
+      'A pasta existe, mas não tem um .git dentro. Confira o caminho em Configurações.', res.repo];
+    case 'NO_GITFLOW': return ['git flow não está instalado',
+      'O comando não respondeu nesta máquina. Ele precisa estar no PATH do processo do Tickets, não só no seu terminal — depois de instalar, reabra o app.'];
+    case 'NO_GITFLOW_INIT': return ['Este repositório não usa git flow',
+      'Falta rodar "git flow init" nele. Sem isso o comando pararia numa pergunta que ninguém pode responder daqui, então o app cancela antes de travar.', res.repo];
+    default: return ['Não foi possível criar a hotfix', res.error];
+  }
+}
+
+// O rotulo do botao de sair muda com o que ele faz: ha o que cancelar quando existe uma
+// acao pendente, e so o que fechar quando o dialog e informacao. Mesma decisao do #cfg.
+function abrirHotfixAsk(titulo, texto, codigo, confirmLabel) {
+  $('hotfixAskTitle').textContent = titulo;
+  const p = $('hotfixAskText');
+  p.textContent = texto;
+  if (codigo) p.append(el('br'), el('code', null, codigo));   // caminho e dado medido: mono
+  const yes = $('hotfixAskYes');
+  yes.hidden = !confirmLabel;
+  if (confirmLabel) yes.textContent = confirmLabel;
+  $('hotfixAskNo').textContent = confirmLabel ? 'Cancelar' : 'Fechar';
+  $('hotfixAsk').showModal();
+}
+
+function setHotfixando(on) {
+  $('resumoLoadbar').hidden = !on;
+  $('resumoHotfix').disabled = on;
+  $('resumoHotfixLabel').textContent = on ? 'Abrindo…' : 'Hotfix';
+}
+
+async function pedirHotfix() {
+  const t = current;
+  const id = t && ticketId(t);
+  if (!id) return;
+
+  setHotfixando(true);
+  const res = await window.api.hotfixProbe(id, t);
+  setHotfixando(false);
+
+  if (res.error) return hotfixFalhou(res);
+
+  // Workspace limpo nao tem o que avisar: nada vai ser guardado, entao nao ha pergunta.
+  if (!res.dirty) return rodarHotfix();
+
+  const n = res.dirty === 1 ? '1 arquivo alterado' : `${res.dirty} arquivos alterados`;
+  abrirHotfixAsk('Guardar as alterações antes?',
+    `Este repositório tem ${n} em ${res.branch}. Tudo vai para um stash antes de criar ${res.alvo} — nada se perde, e "git stash pop" traz de volta.`,
+    res.repo, 'Guardar e criar');
+}
+
+async function rodarHotfix() {
+  const t = current;
+  const id = t && ticketId(t);
+  if (!id) return;
+
+  setHotfixando(true);
+  const res = await window.api.hotfixStart(id, t);
+  setHotfixando(false);
+
+  if (res.error) return hotfixFalhou(res);
+  closeResumo();   // sucesso nao tem faixa: o terminal abrindo e a confirmacao
+}
+
+function hotfixFalhou(res) {
+  if (HOTFIX_CODIGOS.has(res.error)) {
+    const [titulo, texto, codigo] = hotfixErro(res);
+    return abrirHotfixAsk(titulo, texto, codigo, null);
+  }
+  // Depois que o stash existe, um erro que nao o cita faz o usuario achar que perdeu o
+  // trabalho. A faixa e a mesma do "nao foi possivel refazer": o resumo continua atras dela.
+  const onde = res.stash ? ` Suas alterações estão no stash "${res.stash}" — "git stash pop" traz de volta.` : '';
+  showNoticeIn('resumoNotice', 'down', 'Não foi possível criar a hotfix: ' + res.error + onde);
 }
 
 /* ---------- carga ---------- */
@@ -1012,6 +1110,13 @@ $('dResumir').addEventListener('click', pedirResumo);
 $('resumoClose').addEventListener('click', closeResumo);
 $('resumo').addEventListener('close', closeResumo);
 $('resumoRedo').addEventListener('click', () => openResumo(true));
+$('resumoHotfix').addEventListener('click', pedirHotfix);
+$('hotfixAskNo').addEventListener('click', () => $('hotfixAsk').close());
+$('hotfixAskForm').addEventListener('submit', e => {
+  e.preventDefault();
+  $('hotfixAsk').close();
+  rodarHotfix();
+});
 $('claudeAskNo').addEventListener('click', () => $('claudeAsk').close());
 $('claudeAskForm').addEventListener('submit', async e => {
   e.preventDefault();

@@ -1,7 +1,7 @@
 # Anexos
 
 > **Por que um doc só para isso:** o pipeline atravessa quatro camadas (portal → API →
-> processo main → renderer) e concentra as três armadilhas que mais custaram tempo no
+> processo main → renderer) e concentra as quatro armadilhas que mais custaram tempo no
 > projeto. Nenhuma delas é óbvia lendo só um dos lados.
 
 **Princípio de produto:** pré-visualizar sem baixar nada. Nenhum byte de anexo toca o
@@ -63,7 +63,7 @@ escondido atrás de scroll horizontal simplesmente desaparece.
 
 ---
 
-## As três armadilhas
+## As quatro armadilhas
 
 ### 1. O id vai no path, nunca no host
 
@@ -102,6 +102,35 @@ carrega `Access-Control-Allow-Origin`.
 | imagem, vídeo, áudio, pdf | URL `anexo://` direto no elemento | Elementos de mídia não passam por CORS |
 | texto, xml, sql, csv, json | IPC `anexo-text` | Evita CORS e já resolve encoding |
 | xlsx, docx | IPC `anexo-html` | Conversão acontece no main |
+
+### 4. Nome de arquivo acentuado derrubava o processo main
+
+Um anexo chamado `Notificação.png` vinha com
+`Content-Disposition: attachment; filename="Notificação.png"`. Com `net.fetch` do Electron,
+esse valor chega ao `Headers` com **U+FFFD** no lugar do acento, e `Headers.set` o rejeita
+como ByteString (`65533 > 255`). A exceção acontece **dentro do Electron**, antes de
+qualquer linha nossa — sem `try/catch` possível — e o app inteiro morre em
+"A JavaScript error occurred in the main process".
+
+O sintoma enganava: `.png` e `.pdf` quebravam, `.txt` e `.xlsx` não. Não era o tipo do
+arquivo — era o caminho. Mídia usa `anexoStream` (`net.fetch`); texto e planilha usam
+`anexoBytes`, que sempre usou o `fetch` global (undici), e o undici decodifica header em
+latin1, que **nunca** produz U+FFFD.
+
+Dois consertos, porque um só não bastava:
+
+1. **`anexoStream` usa o `fetch` global**, não o `net.fetch`. É o único que impede a
+   exceção, já que ela nasce dentro do Electron.
+2. **Nenhum header do portal é copiado.** `respHeaders()` (`services/anexo.js`) monta a
+   resposta do zero — `Content-Disposition: inline` e, quando dá para afirmar,
+   `Content-Type`. Fail-closed, como o `sanitize.js`. O header que derrubava o app nem era
+   usado: o portal marca **todo** anexo como `attachment` e nós sobrescrevemos sempre.
+
+`Content-Length` ficou de fora de propósito: o undici descompacta gzip sozinho, e o valor
+do portal se refere ao corpo compactado — repassá-lo truncaria o arquivo.
+
+E o handler do protocolo ganhou `try/catch`. Diferente de um `ipcMain.handle`, ele não tem
+rede embaixo: qualquer exceção ali derruba o processo, então falha agora vira `502`.
 
 ---
 

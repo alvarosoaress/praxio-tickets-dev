@@ -55,9 +55,9 @@ arquivo único, a doc dela mora em `docs/`.
 | Arquivo       | Papel                                                                                                          |
 | ------------- | -------------------------------------------------------------------------------------------------------------- |
 | `main.js`     | Só o arquivo principal: registra o scheme, liga os módulos de IPC, abre a janela. ~40 linhas                   |
-| `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`                            |
-| `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`                                           |
-| `preload.js`  | Ponte `contextBridge`. 13 funções, nada além disso                                                             |
+| `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`, `git`                     |
+| `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`, `hotfix`                                 |
+| `preload.js`  | Ponte `contextBridge`. 15 funções, nada além disso                                                             |
 | `renderer.js` | Toda a UI: lista, detalhe, filtros, visualizador de anexo, estados de erro                                     |
 | `modulos.js`  | `normModules()`: código de módulo do portal. Puro, como o `sanitize.js`                                        |
 | `sanitize.js` | Allowlist de HTML. Fronteira de confiança — ver regra #2                                                       |
@@ -133,12 +133,27 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 12. **Data do portal não é parseável por `new Date()`.** Vem `DD/MM/YYYY HH:mm:ss`, que o
     JS lê como mês/dia. Sempre `parseBR()` (`renderer.js:33`).
 
-13. **Conteúdo de ticket só sai da máquina com aceite explícito.** O resumo entrega
+13. **Conteúdo de ticket só sai da máquina com aceite explícito, e o aceite é versionado.**
+    O resumo manda também **o conteúdo dos anexos**: imagem e PDF em base64, planilha,
+    `.docx` e arquivos de texto convertidos para texto puro no main. Vídeo e áudio nunca. Isso mudou a categoria do que sai, então `CONSENT_V` subiu para 2 em
+    `services/config.js` e quem já tinha aceitado é perguntado de novo — aceite antigo não
+    cobre dado novo. Pela mesma régua, `CONSENT_V` subiu para **3** quando o resumo passou a
+    levar junto os `.md` da raiz do repositório do módulo (`lerDocs`, `services/claude.js`):
+    até ali só saía conteúdo de ticket, agora sai documentação interna do código. Só `.md`,
+    só a raiz, e código-fonte nunca. A hotfix também escreve
+    o resumo num `.md` dentro do repo e o entrega ao `claude` — e só existe onde já há
+    resumo, ou seja, onde `claudeOk` já foi dado. `ipc/hotfix.js` confere de novo na
+    fronteira: sem resumo em cache, `NO_RESUMO` e nada acontece. O resumo entrega
     título, cliente e o texto dos trâmites ao `claude` do PATH. Sem `claudeOk` no
     `config.json`, `ipc/resumo.js` devolve `NO_CONSENT` e **nada é enviado**. O aceite é
     pedido uma vez, com o que sai escrito por extenso — não numa nota de rodapé.
 
-14. **Dependência nova precisa de justificativa escrita.** Hoje são duas, ambas porque
+14. **Nada vindo do portal entra numa linha de comando.** O único campo que atravessa é o
+    número do ticket, filtrado por allowlist em `slugTicket()` (`services/git.js`), e ele
+    vira nome de branch, nome de arquivo e argumento do terminal. Título, cliente e resumo
+    vão **dentro** do `.md`. Todo comando git usa `execFile` com array de args, sem shell.
+
+15. **Dependência nova precisa de justificativa escrita.** Hoje são duas, ambas porque
     converter `.xlsx`/`.docx` à mão não é viável. Spinner, toast, date-lib e afins não
     entram.
 
@@ -156,6 +171,7 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Anexos não aparecem dentro dos trâmites         | Falta o `?anexos=1` na chamada (`ipc/tickets.js`), ou a API apontada é anterior a essa rota |
 | Trâmite editado no portal não aparece ao reabrir | Cache por `lastUpdate` (`renderer.js`). Se o portal não mexeu no `lastUpdate`, o app serve o que tinha. `F5` no detalhe ignora o cache |
 | PDF abre "Salvar como" em vez de renderizar     | `Content-Disposition: attachment` vazando do portal. O handler força `inline` (`ipc/anexos.js`)                                           |
+| App morre com "A JavaScript error occurred in the main process" ao abrir anexo | Header do portal indo cru para a resposta. `respHeaders()` monta do zero (`services/anexo.js`), e `anexoStream` usa o `fetch` global, nunca `net.fetch` |
 | Imagem do anexo vira ícone quebrado             | Id foi para o _host_ do `anexo://` em vez do path — host numérico vira IPv4 decimal                                                     |
 | `fetch('anexo://…')` falha no renderer          | CORS. Texto/planilha/docx vão por IPC; só `<img>`/`<video>`/`<iframe>` usam a URL                                                       |
 | Estilo aplicado por JS não pega                 | CSP `style-src`. O zoom da imagem escreve `transform` inline                                                                            |
@@ -163,9 +179,24 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Ticket abre sem trâmites, com "Ticket sem id"   | O `link` do portal veio sem `/TicketPrincipal/<id>`; `ticketId()` (`renderer.js:105`)                                                   |
 | "Claude CLI não encontrado"                     | O `claude` não está no PATH **do processo Electron**. O `.exe` não embute o CLI — cada máquina precisa do Claude Code instalado |
 | Resumir devolve "Not logged in"                 | O CLI está instalado mas sem login. `claude /login` no terminal. Nunca é a chave da API do app |
+| O app pediu o aceite do Claude de novo          | Esperado: `CONSENT_V` subiu (`services/config.js`). O aceite descreve o que sai — v2 quando entrou imagem, v3 quando entrou a doc do repositório |
+| Resumo fala "módulo de estoque" em vez de nomear a unit | Falta apontar o repositório do módulo em Configurações → Repositórios. Sem repo, `lerDocs` não tem o que ler e o prompt vai sem `CONTEXTO DO SISTEMA` |
+| Doc nova do repo não apareceu no resumo         | Só `.md` da **raiz** entra, e o resumo em cache não se refaz sozinho — "Refazer" |
+| Resumo ignora um anexo                          | Cada tipo tem pista e cota em `LANE`/`TETO_QTD` (`services/claude.js`): 4 imagens, 2 PDFs, 4 de texto, 8 no total. Vídeo, áudio, `.zip`, `bmp`, `svg` e `.doc` antigo nunca entram |
+| Resumo ignorou o PDF                            | Teto de 10 páginas ou 2 MB. A contagem de páginas é por regex e falha em PDF 1.5+ comprimido; aí o que corta é o tamanho (`paginasPdf`, `services/anexo.js`) |
+| Resumo não usou a imagem do trâmite certo      | O portal não marca escalação. O casamento é por contagem de rótulos do formulário (`CAMPOS_ESCALACAO`, 3 de 6); vale a escalação mais recente com imagem, e sem casar cai para as primeiras do ticket |
 | Botão Resumir fica desabilitado                 | Ele só libera quando os trâmites chegam — é o que ele manda para o Claude (`openDetail`) |
 | Resumo não atualiza depois de um trâmite novo   | Esperado: o cache não se refaz sozinho. A faixa âmbar avisa e "Refazer" atualiza |
 | Repositórios somem ao reabrir o app             | `config.json` não gravou. Eles salvam sozinhos a cada mudança, não no botão Salvar — que governa só a chave |
+| "Nenhum repositório para o módulo X"             | O módulo não foi apontado em Configurações → Repositórios. O mapa é `config.repos` |
+| "git flow não está instalado"                    | O `git-flow` não está no PATH **do processo Electron**. Instalar e reabrir o app |
+| "Este repositório não usa git flow"              | Falta `git flow init` no repo. `git flow version` passa mesmo assim — são dois checks diferentes (`services/git.js`) |
+| Hotfix trava sem responder                      | Seria o `hotfix start` num repo sem `git flow init`, esperando resposta num prompt sem TTY. O check de `gitflow.branch.develop` existe para isso |
+| "Branches 'master' and 'origin/master' have diverged" | A hotfix nasce da produção, e o gitflow a quer igual à origin. O app adianta ela sozinho (`git fetch origin <master>:<master>`, `services/git.js`); se a mensagem persistir é divergência de verdade — há commit local na produção que a origin não tem, e isso não dá para resolver automaticamente |
+| Terminal da hotfix abre mas o `claude` não roda | `[erro 0x80070002 ao iniciar ""cmd /k claude … Leia" …]` era o `wt`, que reanalisa a linha de comando e desloca as aspas da frase. Saiu do código: só `cmd /c start`, que no Windows 11 abre no Windows Terminal do mesmo jeito |
+| Terminal da hotfix abre e fecha na hora         | `claude` não está no PATH. O `cmd /k` segura a janela para o erro ficar legível |
+| Minhas alterações sumiram depois da hotfix      | Estão no stash, com o número do ticket na mensagem. `git stash list` → `git stash pop` |
+| `TICKET-<n>.md` aparece no `git status`         | O append no `.git/info/exclude` falhou. É só ruído — o arquivo pode ser apagado |
 | Resumo some ao reabrir o app                    | `%APPDATA%	ickets
 esumos.json` não gravou. Apagar o arquivo é seguro — só perde cache |
 

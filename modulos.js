@@ -40,4 +40,17 @@ function unicos(repos) {
   return out;
 }
 
-if (typeof module !== 'undefined') module.exports = { normModules, unicos, MAX_MODULES };
+// Qual repositorio local responde por um modulo do portal. Primeiro consumidor do mapa que
+// o dialog de Configuracoes grava desde sempre — ate aqui ninguem lia esses caminhos.
+// Passa pelo normModules dos dois lados porque o modulo vem do portal como veio ("wtr",
+// "WTR - Transporte") e o do config veio do que o usuario digitou.
+function repoDe(repos, mod) {
+  const alvo = normModules(mod)[0];
+  if (!alvo) return null;
+  for (const r of Array.isArray(repos) ? repos : []) {
+    if (normModules(r && r.modules).includes(alvo)) return r;
+  }
+  return null;
+}
+
+if (typeof module !== 'undefined') module.exports = { normModules, unicos, repoDe, MAX_MODULES };

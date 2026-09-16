@@ -3,9 +3,12 @@
 const assert = require('assert');
 const { parseBR, minutesSince, ageLabel, ageBucket, statusKey, matches, prettyXml, kindOf, anexosDe, cacheGet, cachePut } = require('./renderer.js');
 const { safeHref, KEEP, NUKE, PORTAL_BASE } = require('./sanitize.js');
-const { buildPrompt, parseResult, MAX_PROMPT_CHARS } = require('./services/claude.js');
+const { buildPrompt, buildContent, parseResult, parseSize, escolherAnexos, lerDocs, MAX_PROMPT_CHARS, MAX_DOCS_CHARS,
+        MAX_IMAGENS, MAX_PDFS, MAX_TEXTOS, MAX_ANEXOS, MAX_TEXTO_TOTAL } = require('./services/claude.js');
+const { respHeaders } = require('./services/anexo.js');
 const { parseResumo } = require('./renderer.js');
-const { normModules, unicos, MAX_MODULES } = require('./modulos.js');
+const { normModules, unicos, repoDe, MAX_MODULES } = require('./modulos.js');
+const { slugTicket, buildBriefing, jaExiste, MAX_SLUG } = require('./services/git.js');
 
 // parser: o portal manda "DD/MM/YYYY HH:mm:ss", que new Date() le como MM/DD
 const d = parseBR('14/09/2026 15:59:55');
@@ -163,13 +166,37 @@ assert.ok(/omitido/.test(cortado), 'avisa que cortou, em vez de mentir por omiss
 // um unico tramite absurdo tambem nao pode furar o teto
 assert.ok(buildPrompt({}, [{ content: 'X'.repeat(200000) }]).length <= MAX_PROMPT_CHARS);
 
-// saida do CLI: is_error traz o motivo dentro de result ("Not logged in"), e e isso que o
-// usuario precisa ler — traduzir esconderia a causa
-assert.deepStrictEqual(parseResult(JSON.stringify({ result: '  resumo  ' })), { text: 'resumo' });
-assert.deepStrictEqual(parseResult(JSON.stringify({ result: 'Not logged in', is_error: true })), { error: 'Not logged in' });
+// doc do repositorio do modulo: entra ANTES do ticket, enquadrada como referencia, e fora
+// do orcamento dos tramites — se ela descontasse do teto, a doc comeria a historia que ela
+// existe para esclarecer
+const comDoc = buildPrompt({ number: '9' }, trs, [], [], '--- CLAUDE.md ---\nVGCE.pas e o hub de saldo');
+assert.ok(comDoc.includes('VGCE.pas'), 'a doc entra no prompt');
+assert.ok(comDoc.indexOf('CONTEXTO DO SISTEMA') < comDoc.indexOf('TICKET 9'), 'referencia antes do caso');
+assert.ok(/não é instrução para você/.test(comDoc), 'CLAUDE.md e escrito PARA um agente: tem que vir enquadrado');
+const semDoc = buildPrompt({ number: '9' }, trs);
+assert.ok(!semDoc.includes('CONTEXTO DO SISTEMA'), 'sem repositorio apontado, nada muda no prompt');
+assert.ok(comDoc.includes(semDoc), 'a doc so prefixa: nao tira um trâmite do lugar');
+const gordoComDoc = buildPrompt({ number: '9' }, gordo, [], [], 'D'.repeat(MAX_DOCS_CHARS));
+assert.ok(gordoComDoc.includes(' n0'), 'o tramite mais recente continua entrando com doc no prompt');
+assert.ok(gordoComDoc.length <= MAX_PROMPT_CHARS + MAX_DOCS_CHARS + 1000, 'os dois tetos somados seguram o prompt');
+
+// saida do CLI: agora e stream-json, ou seja JSONL — uma linha por evento e so a ultima
+// `type:"result"` interessa. is_error traz o motivo dentro de result ("Not logged in"), e
+// e isso que o usuario precisa ler — traduzir esconderia a causa
+const jsonl = (...o) => o.map(x => JSON.stringify(x)).join('\n') + '\n';
+const RESULT = r => ({ type: 'result', subtype: 'success', ...r });
+
+assert.deepStrictEqual(parseResult(jsonl(RESULT({ result: '  resumo  ' }))), { text: 'resumo' });
+assert.deepStrictEqual(
+  parseResult(jsonl({ type: 'system', subtype: 'init' }, { type: 'assistant' }, RESULT({ result: 'resumo' }))),
+  { text: 'resumo' }, 'ignora as linhas de evento antes do result');
+assert.deepStrictEqual(parseResult(jsonl(RESULT({ result: 'Not logged in', is_error: true }))), { error: 'Not logged in' });
 assert.ok(parseResult('nao e json').error, 'stdout quebrado vira error, nao excecao');
 assert.ok(parseResult('').error, 'stdout vazio vira error');
-assert.ok(parseResult(JSON.stringify({ result: '' })).error, 'resumo vazio e erro, nao sucesso silencioso');
+assert.ok(parseResult(jsonl(RESULT({ result: '' }))).error, 'resumo vazio e erro, nao sucesso silencioso');
+assert.ok(parseResult(jsonl({ type: 'assistant' })).error, 'sem linha de result e erro, nao sucesso vazio');
+// uma linha truncada no meio nao pode derrubar o parse da que importa
+assert.deepStrictEqual(parseResult('{"type":"assist\n' + jsonl(RESULT({ result: 'ok' }))), { text: 'ok' });
 
 
 // leitura do resumo: o modelo escreve o rotulo sozinho na linha. O parser existe para dar
@@ -238,3 +265,337 @@ assert.deepStrictEqual(unicos(null), []);
 assert.strictEqual(unicos([{ path: 'A', modules: [] }])[0].path, 'A');
 
 console.log('ok');
+
+
+// hotfix: slugTicket e a fronteira com a linha de comando, o nome de branch e o nome de
+// arquivo. O que importa nao e o formato bonito, e que NADA de shell sobreviva.
+assert.strictEqual(slugTicket(' 938963 '), '938963');
+assert.strictEqual(slugTicket('TK-938963'), 'TK-938963');
+for (const veneno of ['938963 & calc.exe', '"; rm -rf /', '$(whoami)', 'a|b', 'a`b`c', 'a;b', "a'b", 'a\b']) {
+  const s = slugTicket(veneno);
+  assert.ok(/^[A-Za-z0-9._-]+$/.test(s), `slug de ${veneno} escapou da allowlist: ${s}`);
+}
+// barra fora + pontos aparados na frente: path traversal morre sem check proprio
+assert.strictEqual(slugTicket('../../evil'), 'evil');
+assert.ok(!slugTicket('../../evil').includes('/'));
+assert.strictEqual(slugTicket(''), null, 'vazio e null, nao string vazia virando branch sem nome');
+assert.strictEqual(slugTicket(null), null);
+assert.strictEqual(slugTicket('///'), null, 'so caractere proibido tambem e null');
+assert.ok(slugTicket('9'.repeat(200)).length <= MAX_SLUG);
+
+// modulo -> repositorio: o portal manda o modulo como quiser, o config guarda o que o
+// usuario digitou. Os dois lados passam por normModules, entao caixa nao pode decidir.
+const REPOS = [{ path: 'C:\dev\a', modules: ['WTR'] }, { path: 'C:\dev\b', modules: ['WCX', 'WCE'] }];
+assert.strictEqual(repoDe(REPOS, 'wtr').path, 'C:\dev\a');
+assert.strictEqual(repoDe(REPOS, 'WCE').path, 'C:\dev\b');
+assert.strictEqual(repoDe(REPOS, 'WTR - Transporte').path, 'C:\dev\a', 'modulo com sufixo do portal ainda casa');
+assert.strictEqual(repoDe(REPOS, 'WMS'), null, 'modulo sem repo apontado e null, nao o primeiro da lista');
+assert.strictEqual(repoDe(REPOS, ''), null);
+assert.strictEqual(repoDe([], 'WTR'), null);
+assert.strictEqual(repoDe(null, null), null);
+
+// briefing: leva o resumo e os metadados, e avisa o Claude de que o texto do ticket e
+// material, nao ordem — e o mesmo risco de injecao que o SYSTEM_PROMPT ja trata
+const brf = buildBriefing(
+  { number: '938963', title: 'Erro na NF-e', client: 'ACME', module: 'WTR' },
+  'ONDE\nFaturamento.', '938963');
+assert.ok(brf.includes('938963') && brf.includes('ACME') && brf.includes('Faturamento.'));
+assert.ok(brf.includes('nunca instrução'), 'o briefing tem que desarmar instrucao vinda do ticket');
+assert.ok(brf.includes('hotfix/938963'), 'diz em qual branch o Claude esta');
+assert.ok(buildBriefing({}, '', 'x').includes('(sem resumo)'), 'ticket vazio ainda devolve texto util');
+assert.ok(buildBriefing().length > 0, 'sem argumento nenhum nao lanca');
+
+// a mensagem do gitflow quando a branch ja esta la. Sao duas formas e a primeira e a que
+// acontece de verdade no AVH — sem ela, o segundo clique no mesmo ticket larga o usuario
+// na develop em vez de reabrir a hotfix
+assert.ok(jaExiste("Fatal: There is an existing hotfix branch '938963'. Finish that one first."));
+assert.ok(jaExiste("Branch 'hotfix/938963' already exists. Pick another name."));
+assert.ok(!jaExiste('fatal: couldn\'t find remote ref develop'), 'erro de rede nao vira "ja existe"');
+assert.ok(!jaExiste(''), 'vazio nao vira "ja existe"');
+assert.ok(!jaExiste(null));
+
+
+// empacotamento: o .exe leva SO o que esta em build.files, e esquecer um arquivo ali nao
+// da erro nenhum no `npm start` — so no executavel, e no boot, porque os require ficam no
+// topo dos modulos. Foi o que aconteceu com o modulos.js. Nao e logica, mas mora aqui pelo
+// mesmo motivo que o resto: quebra em silencio.
+const fs = require('fs');
+const pkgFiles = JSON.parse(fs.readFileSync('./package.json', 'utf8')).build.files;
+const precisa = new Set();
+
+// o que o renderer carrega por <script src>
+for (const m of fs.readFileSync('./index.html', 'utf8').matchAll(/src="([^"]+\.js)"/g)) precisa.add(m[1]);
+
+// o que o main e seus modulos requerem e mora na raiz (ipc/ e services/ ja vao por glob)
+for (const dir of ['.', './ipc', './services']) {
+  for (const f of fs.readdirSync(dir)) {
+    if (!f.endsWith('.js') || f === 'test.js') continue;
+    for (const m of fs.readFileSync(`${dir}/${f}`, 'utf8').matchAll(/require\('\.\.?\/([\w.-]+)'\)/g)) {
+      const alvo = m[1].endsWith('.js') ? m[1] : m[1] + '.js';
+      if (fs.existsSync('./' + alvo)) precisa.add(alvo);
+    }
+  }
+}
+
+assert.ok(precisa.has('modulos.js'), 'a varredura tem que enxergar o modulos.js');
+assert.ok(precisa.has('sanitize.js') && precisa.has('renderer.js'), 'e os outros arquivos de raiz');
+for (const f of precisa) {
+  assert.ok(pkgFiles.includes(f), `${f} e carregado em runtime mas falta em build.files: o .exe quebraria no boot`);
+}
+
+
+// headers do protocolo anexo://: a invariante e que o resultado NUNCA derrube Headers().
+// Copiar os headers do portal derrubava o processo main — um anexo com nome acentuado vem
+// com U+FFFD no Content-Disposition, e Headers.set rejeita isso como ByteString.
+const FFFD = String.fromCharCode(65533);
+const naoDerruba = h => { new Headers(h); return true; };   // lanca se algum valor for invalido
+
+assert.ok(naoDerruba(respHeaders('image/png', 'png')));
+assert.ok(naoDerruba(respHeaders('attachment; filename="Notifica' + FFFD + 'ao.png"', 'png')));
+assert.ok(naoDerruba(respHeaders(FFFD + FFFD, null)));
+assert.ok(naoDerruba(respHeaders(null, null)));
+
+// o portal marca TODO anexo como attachment; sem o inline o Chromium abre "Salvar como"
+assert.strictEqual(respHeaders('image/png', 'png')['Content-Disposition'], 'inline');
+assert.strictEqual(respHeaders(null, null)['Content-Disposition'], 'inline');
+
+// tipo bom passa; octet-stream e lixo caem no palpite pela extensao
+assert.strictEqual(respHeaders('image/png', 'png')['Content-Type'], 'image/png');
+assert.strictEqual(respHeaders('application/octet-stream', 'png')['Content-Type'], 'image/png');
+assert.strictEqual(respHeaders('', 'pdf')['Content-Type'], 'application/pdf');
+assert.strictEqual(respHeaders('image/' + FFFD, 'png')['Content-Type'], 'image/png', 'tipo com byte invalido nao vira header');
+
+// sem tipo e sem extensao conhecida: melhor nao afirmar nada do que afirmar errado
+assert.ok(!('Content-Type' in respHeaders('', 'xyz')));
+assert.ok(!('Content-Type' in respHeaders(null, null)));
+
+// Content-Length NAO pode ser repassado: o undici descompacta gzip e o valor do portal se
+// refere ao corpo compactado — repassar truncaria o arquivo
+assert.ok(!('Content-Length' in respHeaders('image/png', 'png')));
+
+
+// tamanho do anexo vem como string formatada em pt-BR, nunca numero. Sem ler isso nao da
+// para respeitar teto antes de baixar os bytes.
+assert.strictEqual(parseSize('114,08 KB'), Math.round(114.08 * 1024));
+assert.strictEqual(parseSize('16,45 MB'), Math.round(16.45 * 1048576));
+assert.strictEqual(parseSize('1.234,5 KB'), Math.round(1234.5 * 1024), 'ponto e separador de milhar, nao decimal');
+assert.strictEqual(parseSize('512 B'), 512);
+assert.strictEqual(parseSize('7 KB'), 7168, 'sem casa decimal tambem vale');
+assert.strictEqual(parseSize(''), null);
+assert.strictEqual(parseSize(null), null);
+assert.strictEqual(parseSize('grande'), null, 'lixo vira null, nao NaN silencioso');
+assert.strictEqual(parseSize('10 PB'), null, 'unidade fora da tabela nao e adivinhada');
+
+// escolha das imagens. So png/jpg/jpeg/gif/webp: a API nao recebe bmp, e svg esta fora
+// pelo mesmo motivo do sanitize.js — svg executa script.
+const img = (id, ext, size = '100 KB') => ({ id, name: `f.${ext}`, ext, size });
+const tr = (content, anexos) => ({ content, anexos });
+
+const so = escolherAnexos([tr('x', [img('1', 'png'), img('2', 'bmp'), img('3', 'svg'), img('4', 'xlsx'), img('5', 'jpeg')])]);
+assert.deepStrictEqual(so.anexos.map(a => a.id), ['1', '4', '5'], 'bmp e svg ficam de fora; planilha entra como texto');
+assert.deepStrictEqual(so.anexos.map(a => a.lane), ['image', 'sheet', 'image'], 'cada anexo sai com a pista anotada');
+assert.strictEqual(so.viaEscalacao, false);
+
+// video e audio ficam de fora por decisao de produto: token demais para um resumo de
+// relance. `.doc` antigo fica de fora porque o mammoth le .docx e nada le OLE binario.
+for (const ext of ['mp4', 'webm', 'mov', 'mp3', 'wav', 'm4a', 'doc', 'zip', 'rar', 'pfx', 'exe']) {
+  assert.deepStrictEqual(escolherAnexos([tr('x', [img('9', ext)])]).anexos, [], `${ext} nao pode entrar`);
+}
+// e os que o usuario pediu entram, cada um na sua pista
+const PISTAS = { csv: 'texto', xlsx: 'sheet', docx: 'doc', pdf: 'pdf', txt: 'texto', xml: 'texto', png: 'image' };
+for (const [ext, lane] of Object.entries(PISTAS)) {
+  assert.strictEqual(escolherAnexos([tr('x', [img('9', ext)])]).anexos[0].lane, lane, `${ext} -> ${lane}`);
+}
+
+// (a deteccao da escalacao e testada mais abaixo, com o formulario real do portal)
+
+// sem casar, o fallback e o ticket inteiro em ordem cronologica — a API manda do mais
+// recente para o mais antigo, e a imagem que explica o problema costuma ser a primeira
+const semEsc = escolherAnexos([tr('novo', [img('3', 'png')]), tr('meio', [img('2', 'png')]), tr('velho', [img('1', 'png')])]);
+assert.deepStrictEqual(semEsc.anexos.map(a => a.id), ['1', '2', '3'], 'do mais antigo para o mais recente');
+assert.strictEqual(semEsc.viaEscalacao, false);
+
+// tetos: quantidade e soma. Um print gigante nao pode comer o orcamento inteiro
+const muitas = escolherAnexos([tr('x', [1, 2, 3, 4, 5, 6].map(n => img(String(n), 'png')))]);
+assert.strictEqual(muitas.anexos.length, MAX_IMAGENS, 'teto de quantidade');
+assert.deepStrictEqual(escolherAnexos([tr('x', [img('1', 'png', '9,5 MB'), img('2', 'png')])]).anexos.map(a => a.id),
+  ['2'], 'imagem acima do teto individual sai, as outras continuam');
+assert.deepStrictEqual(escolherAnexos([tr('x', [img('1', 'png', '3 MB'), img('2', 'png', '3 MB'), img('3', 'png', '3 MB')])]).anexos.length,
+  2, 'teto de soma corta antes da terceira');
+assert.deepStrictEqual(escolherAnexos([tr('x', [img('1', 'png', 'ilegivel')])]).anexos.map(a => a.id),
+  ['1'], 'tamanho ilegivel nao descarta: o teto de verdade e conferido nos bytes');
+
+// nada disso pode lancar com entrada torta
+assert.deepStrictEqual(escolherAnexos([]).anexos, []);
+assert.deepStrictEqual(escolherAnexos(null).anexos, []);
+assert.deepStrictEqual(escolherAnexos([{}, { anexos: null }, null]).anexos, []);
+
+// blocos de conteudo: imagem ANTES do texto, e o texto diz o que as imagens sao
+const blocos = buildContent({ number: '1', title: 'T' }, [{ content: 'c' }],
+  [{ name: 'erro.png', mime: 'image/png', b64: 'QUJD' }]);
+assert.strictEqual(blocos.length, 2);
+assert.strictEqual(blocos[0].type, 'image', 'imagem vem antes do texto que fala dela');
+assert.deepStrictEqual(blocos[0].source, { type: 'base64', media_type: 'image/png', data: 'QUJD' });
+assert.strictEqual(blocos[1].type, 'text');
+assert.ok(blocos[1].text.includes('erro.png'), 'o texto nomeia o anexo');
+assert.ok(blocos[1].text.includes('ARQUIVOS ANEXADOS (1)'));
+
+// PDF vai como bloco `document`, nao `image` — sao shapes diferentes na API
+const comPdf = buildContent({ number: '1' }, [{ content: 'c' }],
+  [{ name: 'danfe.pdf', mime: 'application/pdf', b64: 'QUJD' }]);
+assert.strictEqual(comPdf[0].type, 'document');
+assert.strictEqual(comPdf[0].source.media_type, 'application/pdf');
+
+// planilha, docx e texto NAO viram bloco: entram convertidos dentro do proprio prompt
+const comTexto = buildContent({ number: '1' }, [{ content: 'c' }],
+  [{ name: 'notas.csv', texto: 'nota;valor\n123;10,00' }]);
+assert.strictEqual(comTexto.length, 1, 'anexo de texto nao cria bloco proprio');
+assert.ok(comTexto[0].text.includes('CONTEÚDO DOS ANEXOS'));
+assert.ok(comTexto[0].text.includes('notas.csv') && comTexto[0].text.includes('123;10,00'));
+
+// o conteudo do anexo vem DEPOIS dos tramites: a historia do ticket e o que da sentido
+// ao arquivo, e nao o contrario
+assert.ok(comTexto[0].text.indexOf('TRÂMITES') < comTexto[0].text.indexOf('CONTEÚDO DOS ANEXOS'));
+
+// teto por anexo: uma planilha gigante nao pode empurrar os tramites para fora
+const gorda = buildContent({ number: '1' }, [{ content: 'c' }],
+  [{ name: 'g.csv', texto: 'x'.repeat(500000) }]);
+assert.ok(gorda[0].text.length < 200000, 'anexo gigante e truncado');
+assert.ok(gorda[0].text.includes('anexo truncado'), 'e avisa que cortou, em vez de mentir por omissao');
+
+// teto do total, somando varios anexos de texto
+const varios = buildContent({ number: '1' }, [{ content: 'c' }],
+  Array.from({ length: 6 }, (_, i) => ({ name: `a${i}.txt`, texto: 'y'.repeat(20000) })));
+const soAnexos = varios[0].text.slice(varios[0].text.indexOf('CONTEÚDO DOS ANEXOS'));
+assert.ok(soAnexos.length <= MAX_TEXTO_TOTAL + 2000, 'o total dos anexos respeita o teto');
+
+// mistura: imagem e PDF viram bloco, o resto vai no texto — e a legenda conta os dois
+const mix = buildContent({ number: '1' }, [{ content: 'c' }], [
+  { name: 'p.png', mime: 'image/png', b64: 'QQ==' },
+  { name: 'd.pdf', mime: 'application/pdf', b64: 'QQ==' },
+  { name: 'n.csv', texto: 'a;b' }
+]);
+assert.deepStrictEqual(mix.map(b => b.type), ['image', 'document', 'text']);
+assert.ok(mix[2].text.includes('ARQUIVOS ANEXADOS (2)'), 'a legenda conta so os que viraram bloco');
+assert.ok(mix[2].text.includes('1 anexo(s) de texto'), 'e avisa que ha texto mais abaixo');
+
+// sem anexo, o conteudo volta a ser um bloco de texto so — e sem legenda mentindo
+const semImg = buildContent({ number: '1' }, [{ content: 'c' }], []);
+assert.strictEqual(semImg.length, 1);
+assert.strictEqual(semImg[0].type, 'text');
+assert.ok(!semImg[0].text.includes('ARQUIVOS ANEXADOS'));
+assert.ok(!semImg[0].text.includes('CONTEÚDO DOS ANEXOS'));
+assert.strictEqual(buildContent({ number: '1' }, []).length, 1, 'sem argumento de imagem nao quebra');
+
+// imagem pela metade (sem mime ou sem bytes) e descartada em vez de virar bloco invalido
+assert.strictEqual(buildContent({}, [], [{ name: 'x.png' }, { mime: 'image/png' }, null]).length, 1);
+
+
+// deteccao da escalacao. O tramite que passa o ticket para o desenvolvimento e um
+// formulario, e estes dois sao texto real do portal — incluindo "Servidor:srv00" sem
+// espaco e o "Periodo de Teste:" em branco.
+const FORM_A = `Versão de Teste:  2.3.8.2
+Caminho: Faturamento > Enviar email
+Período de Teste:
+Base de Teste: AWS_SAOLUIZEXPRESS
+Servidor:srv00
+Problema: O erro relatado anteriormente voltou a ocorrer no sistema, poderia verificar por gentileza?`;
+
+const FORM_B = `Versão de Teste: 2.3.7.4
+Caminho: Faturas > Enviar email
+Período de Teste:
+Base de Teste: aws_saoluizexpress
+Servidor: srv00
+Usuário: sa
+Senha: info
+Problema: Ao enviar uma fatura por email o sistema retorna erro. Ao verificar as configurações de internet do cliente está tudo normal`;
+
+const ESC_IMG = [{ id: '50', name: 'erro.png', ext: 'png', size: '120 KB' }];
+
+// os dois formatos reais casam, com e sem os campos opcionais Usuario/Senha
+assert.deepStrictEqual(escolherAnexos([{ content: FORM_A, anexos: ESC_IMG }]).viaEscalacao, true);
+assert.deepStrictEqual(escolherAnexos([{ content: FORM_B, anexos: ESC_IMG }]).viaEscalacao, true);
+// sem acento e em caixa alta continua casando: e contagem de rotulo, nao frase exata
+assert.strictEqual(escolherAnexos([{ content: FORM_A.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase(), anexos: ESC_IMG }]).viaEscalacao, true);
+
+// prosa comum NAO pode virar escalacao, nem quando cita um rotulo solto
+for (const texto of [
+  'Bom dia, segue em anexo o print do erro.',
+  'Sobre o caminho: Faturamento > Enviar email, o cliente confirmou.',
+  'Problema: resolvido, pode fechar o ticket.',
+  '', null
+]) {
+  assert.strictEqual(escolherAnexos([{ content: texto, anexos: ESC_IMG }]).viaEscalacao, false,
+    `nao era escalacao: ${String(texto).slice(0, 40)}`);
+}
+
+// o ticket reescala quando o erro volta numa versao nova (2.3.7.4 -> 2.3.8.2). A lista vem
+// do mais recente para o mais antigo, e a escalacao ATUAL e a que o dev tem em maos.
+const reescalado = escolherAnexos([
+  { content: FORM_A, anexos: [{ id: 'novo', name: 'a.png', ext: 'png', size: '10 KB' }] },
+  { content: 'resposta do cliente', anexos: [] },
+  { content: FORM_B, anexos: [{ id: 'velho', name: 'b.png', ext: 'png', size: '10 KB' }] }
+]);
+assert.deepStrictEqual(reescalado.anexos.map(a => a.id), ['novo'], 'pega a escalacao mais recente');
+assert.strictEqual(reescalado.viaEscalacao, true);
+
+// escalacao mais recente sem imagem nao encerra a busca: tenta a anterior antes de desistir
+const semImgNaNova = escolherAnexos([
+  { content: FORM_A, anexos: [] },
+  { content: FORM_B, anexos: [{ id: 'velho', name: 'b.png', ext: 'png', size: '10 KB' }] }
+]);
+assert.deepStrictEqual(semImgNaNova.anexos.map(a => a.id), ['velho']);
+assert.strictEqual(semImgNaNova.viaEscalacao, true);
+
+// o formulario nao pode cair no corte: e ele que traz versao, caminho, base e servidor, e
+// e dele que vieram as imagens. Sem reservar espaco, num ticket longo ele e o primeiro a
+// sumir — e a imagem chega sem o texto que a explica.
+const longo = [
+  { date: '20/01/2026 10:00', content: 'ultimo tramite' },
+  ...Array.from({ length: 30 }, (_, i) => ({ date: `1${i % 10}/01/2026 10:00`, content: 'R'.repeat(5000) + ' ruido' + i })),
+  { date: '01/01/2026 09:00', content: FORM_A, anexos: ESC_IMG }   // o mais ANTIGO de todos
+];
+const cortadoEsc = buildPrompt({ number: '9' }, longo);
+assert.ok(cortadoEsc.length <= MAX_PROMPT_CHARS, 'o teto continua valendo');
+assert.ok(cortadoEsc.includes('2.3.8.2'), 'a escalacao sobrevive ao corte mesmo sendo a mais antiga');
+assert.ok(cortadoEsc.includes('AWS_SAOLUIZEXPRESS'), 'com os campos que o dev precisa');
+assert.ok(cortadoEsc.includes('FORMULÁRIO DE ESCALAÇÃO'), 'e marcada para o modelo saber o que e');
+assert.ok(cortadoEsc.includes('ultimo tramite'), 'o mais recente continua entrando sempre');
+assert.ok(/omitido/.test(cortadoEsc), 'e ainda avisa que cortou');
+
+// a ordem cronologica nao pode quebrar por causa da reserva
+const iEsc = cortadoEsc.indexOf('2.3.8.2');
+const iUlt = cortadoEsc.indexOf('ultimo tramite');
+assert.ok(iEsc < iUlt, 'a escalacao (mais antiga) aparece antes do ultimo tramite');
+
+// ticket sem escalacao nenhuma se comporta como antes
+assert.ok(buildPrompt({ number: '9' }, [{ content: 'so isso' }]).includes('so isso'));
+assert.ok(!buildPrompt({ number: '9' }, [{ content: 'so isso' }]).includes('FORMULÁRIO DE ESCALAÇÃO'));
+
+
+// lerDocs: le os .md da RAIZ do repo do modulo, em ordem, com teto. Ler doc nunca pode
+// derrubar o resumo — caminho que nao existe, arquivo ilegivel ou repo sem .md devolvem
+// string vazia e o resumo sai como sempre saiu.
+const tmpRepo = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'tickets-docs-'));
+fs.writeFileSync(`${tmpRepo}/CLAUDE.md`, 'hub de saldo: VGCE.pas');
+fs.writeFileSync(`${tmpRepo}/CONVENCAO_RESUMO_TASK.md`, 'TASKS-DOC por modulo');
+fs.writeFileSync(`${tmpRepo}/README.txt`, 'nao e markdown');
+fs.mkdirSync(`${tmpRepo}/Desenvolvimento`);
+fs.writeFileSync(`${tmpRepo}/Desenvolvimento/FUNDO.md`, 'md de subpasta');
+
+const docs = lerDocs(tmpRepo);
+assert.ok(docs.includes('VGCE.pas') && docs.includes('TASKS-DOC'), 'todo .md da raiz entra');
+assert.ok(docs.includes('--- CLAUDE.md ---'), 'cada doc vem nomeada');
+assert.ok(!docs.includes('nao e markdown'), 'so .md');
+assert.ok(!docs.includes('md de subpasta'), 'so a raiz: o repo inteiro traria milhares de arquivos');
+assert.ok(docs.indexOf('VGCE.pas') < docs.indexOf('TASKS-DOC'), 'ordem estavel, nao a do filesystem');
+
+fs.writeFileSync(`${tmpRepo}/GORDA.md`, 'G'.repeat(MAX_DOCS_CHARS * 2));
+const cortada = lerDocs(tmpRepo);
+assert.ok(cortada.length <= MAX_DOCS_CHARS + 500, 'doc gigante nao estoura o teto');
+assert.ok(/truncada/.test(cortada), 'e avisa que cortou');
+
+assert.strictEqual(lerDocs(`${tmpRepo}/nao-existe`), '', 'repo que sumiu do disco nao lanca');
+assert.strictEqual(lerDocs(''), '', 'modulo sem repositorio apontado');
+assert.strictEqual(lerDocs(null), '', 'nem null');
+fs.rmSync(tmpRepo, { recursive: true, force: true });

@@ -23,6 +23,7 @@
       "index.html",
       "renderer.js",
       "sanitize.js",
+      "modulos.js",
       "services/**/*",
       "ipc/**/*",
       "style.css",

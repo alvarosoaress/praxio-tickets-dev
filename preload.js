@@ -13,5 +13,7 @@ contextBridge.exposeInMainWorld('api', {
   resumo: (id, ticket, tramites, refazer) => ipcRenderer.invoke('resumo', { id, ticket, tramites, refazer }),
   getRepos: () => ipcRenderer.invoke('get-repos'),
   setRepos: list => ipcRenderer.invoke('set-repos', list),
-  pickDir: () => ipcRenderer.invoke('pick-dir')
+  pickDir: () => ipcRenderer.invoke('pick-dir'),
+  hotfixProbe: (id, ticket) => ipcRenderer.invoke('hotfix-probe', { id, ticket }),
+  hotfixStart: (id, ticket) => ipcRenderer.invoke('hotfix-start', { id, ticket })
 });

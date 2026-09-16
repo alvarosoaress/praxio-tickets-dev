@@ -1,7 +1,7 @@
 const { ipcMain, protocol } = require('electron');
 const { apiKey } = require('../services/config');
 const { anexoBytes, anexoStream } = require('../services/portalapi');
-const { MAX_CONVERT_BYTES, MIME, toText, toHtml } = require('../services/anexo');
+const { MAX_CONVERT_BYTES, respHeaders, toText, toHtml } = require('../services/anexo');
 
 function register() {
   // Arquivos de texto vêm pelo IPC, não por fetch('anexo://…'): o protocolo é outra
@@ -26,27 +26,27 @@ function register() {
 function registerProtocol() {
   // anexo://portal/<id>?ext=pdf — o id vai no PATH, nunca no host: um host todo
   // numerico e lido como IPv4 decimal (1218235 vira 0.18.150.187).
+  // Ao contrario de um ipcMain.handle, este handler nao tem rede embaixo: uma excecao aqui
+  // vira "A JavaScript error occurred in the main process" e derruba o app inteiro. Por
+  // isso o try/catch, e por isso nenhum header do portal e copiado — ver respHeaders().
   protocol.handle('anexo', async req => {
-    const u = new URL(req.url);
-    const id = u.pathname.replace(/^\//, '');
-    if (!/^\d+$/.test(id)) return new Response('id inválido', { status: 400 });
-    if (!apiKey()) return new Response('sem chave', { status: 401 });
+    try {
+      const u = new URL(req.url);
+      const id = u.pathname.replace(/^\//, '');
+      if (!/^\d+$/.test(id)) return new Response('id inválido', { status: 400 });
+      if (!apiKey()) return new Response('sem chave', { status: 401 });
 
-    const upstream = await anexoStream(id);
-    const headers = new Headers(upstream.headers);
+      const upstream = await anexoStream(id);
+      if (upstream.error) return new Response(upstream.error, { status: upstream.status || 502 });
 
-    // O portal marca TODO anexo como "attachment". Repassar isso faz o Chromium
-    // abrir "Salvar como" em vez de renderizar — justamente o que nao queremos.
-    headers.set('Content-Disposition', 'inline');
-
-    // Quando o portal nao sabe o tipo, o visualizador tambem nao saberia.
-    const ct = headers.get('Content-Type') || '';
-    if (!ct || ct.startsWith('application/octet-stream')) {
-      const guess = MIME[u.searchParams.get('ext')];
-      if (guess) headers.set('Content-Type', guess);
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers: respHeaders(upstream.headers.get('content-type'), u.searchParams.get('ext'))
+      });
+    } catch (e) {
+      console.error('[anexo]', e);
+      return new Response('falha ao servir o anexo', { status: 502 });
     }
-
-    return new Response(upstream.body, { status: upstream.status, headers });
   });
 }
 

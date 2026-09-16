@@ -63,6 +63,12 @@
     <g id="i-resumo" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
       <path d="M4.2 5.6v12.8"/><path d="M8.8 7h11"/><path d="M8.8 12h11"/><path d="M8.8 17h6.6"/>
     </g>
+    <!-- Duas bolas e um arco: a terceira bola da versao canonica vira mancha a 14px,
+         que e o tamanho em que os icones de barra renderizam. -->
+    <g id="i-branch" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6.5 4.6v10.8"/><circle cx="17.5" cy="6.5" r="2.6"/><circle cx="6.5" cy="18" r="2.6"/>
+      <path d="M17.5 9.1a8.4 8.4 0 0 1-8.4 8.4"/>
+    </g>
     <!-- icones de tipo de arquivo: mesma folha, mesmo traco -->
     <g id="f-image" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
       <rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4.5 17 4.8-4.4 3.4 3 3-2.4 3.8 3.4"/>
@@ -203,6 +209,9 @@
     <span class="viewer-meta" id="resumoMeta"></span>
     <span class="spacer"></span>
     <button class="btn btn-ghost" id="resumoRedo" title="Gerar de novo"><svg viewBox="0 0 24 24"><use href="#i-refresh"/></svg>Refazer</button>
+    <!-- Depois de Refazer pela mesma regra da barra do detalhe: a acao que fica dentro do
+         app vem antes da que sai dele. -->
+    <button class="btn btn-ghost" id="resumoHotfix" disabled title="Criar a branch de hotfix deste ticket e abrir o Claude nela"><svg viewBox="0 0 24 24"><use href="#i-branch"/></svg><span id="resumoHotfixLabel">Hotfix</span></button>
     <button class="btn btn-ghost btn-icon" id="resumoClose" title="Fechar (Esc)" aria-label="Fechar" autofocus><svg viewBox="0 0 24 24"><use href="#i-close"/></svg></button>
     <div class="loadbar" id="resumoLoadbar" hidden></div>
   </header>
@@ -219,12 +228,30 @@
   <form method="dialog" id="claudeAskForm">
     <div class="dlg-body">
       <h2>Resumir com o Claude</h2>
-      <p>Para montar o resumo, o app entrega o ticket ao <code>claude</code> instalado nesta máquina: título, cliente e o texto de todos os trâmites. Esse conteúdo sai do seu computador e vai para a Anthropic pela sua conta do Claude Code, como em qualquer conversa sua com o Claude.</p>
-      <p>O resumo é guardado nesta máquina, em <code>%APPDATA%\tickets\resumos.json</code>, para não refazer a chamada toda vez que você abrir o ticket. Ele se refaz sozinho quando o ticket recebe um trâmite novo. Você só precisa autorizar uma vez.</p>
+      <p>Para montar o resumo, o app entrega o ticket ao <code>claude</code> instalado nesta máquina: título, cliente, o texto de todos os trâmites e o conteúdo dos anexos — imagem, PDF, planilha, documento do Word e arquivos de texto como <code>csv</code>, <code>xml</code> e <code>txt</code>.</p>
+      <p>Junto vai a documentação do repositório daquele módulo — os arquivos <code>.md</code> da raiz do repo apontado em Configurações, como o <code>CLAUDE.md</code>. Nenhum código-fonte é lido ou enviado. Esse conteúdo sai do seu computador e vai para a Anthropic pela sua conta do Claude Code, como em qualquer conversa sua com o Claude.</p>
+      <p>O resumo é guardado nesta máquina, em <code>%APPDATA%\tickets\resumos.json</code>, para não refazer a chamada toda vez que você abrir o ticket. Quando chega um trâmite novo ele <b>não</b> se refaz sozinho: avisa que está velho e espera você clicar em Refazer.</p>
     </div>
     <div class="dlg-foot">
       <button class="btn" type="button" id="claudeAskNo">Agora não</button>
       <button class="btn btn-primary" type="submit" id="claudeAskYes">Autorizar e resumir</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Um dialog para os tres casos que impedem ou condicionam a hotfix. Dois dialogs seriam
+     duas telas para o mesmo momento: "ainda nao deu para comecar, e por isto". Falha no
+     meio da sequencia NAO vem para ca — vai para a faixa .notice do resumo, que e onde o
+     app ja diz "rodou e quebrou" sem tirar da tela o que voce estava lendo. -->
+<dialog id="hotfixAsk">
+  <form method="dialog" id="hotfixAskForm">
+    <div class="dlg-body">
+      <h2 id="hotfixAskTitle"></h2>
+      <p id="hotfixAskText"></p>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" type="button" id="hotfixAskNo">Fechar</button>
+      <button class="btn btn-primary" type="submit" id="hotfixAskYes" hidden></button>
     </div>
   </form>
 </dialog>

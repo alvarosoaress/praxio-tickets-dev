@@ -120,7 +120,7 @@ O clique abre um visualizador em `<dialog>` de tela quase cheia, com Esc nativo:
 | resto | mensagem honesta + botão para o portal |
 
 **Nada toca o disco.** Os bytes chegam pelo protocolo `anexo://portal/<id>?ext=…`
-registrado no main, que faz proxy autenticado na API e devolve em stream. Três
+registrado no main, que faz proxy autenticado na API e devolve em stream. Quatro
 armadilhas que custaram tempo e estão amarradas por comentário no código:
 
 1. O id vai no **path**, nunca no host — com scheme `standard`, um host só de dígitos
@@ -129,6 +129,10 @@ armadilhas que custaram tempo e estão amarradas por comentário no código:
    o Chromium abrir "Salvar como" em vez de renderizar; o handler força `inline`.
 3. `fetch('anexo://…')` do renderer morre em CORS (outra origem). Texto, planilha e
    docx vão por IPC; só `<img>`/`<video>/<iframe>` usam a URL direto.
+4. **Nenhum header do portal é copiado para a resposta.** Um anexo com nome acentuado traz
+   U+FFFD no `Content-Disposition`, e `Headers.set` rejeita isso como ByteString — dentro
+   do Electron, antes do nosso código, derrubando o processo main. `respHeaders()` monta do
+   zero o que o visualizador precisa.
 
 Conversão de planilha e docx acontece no **main**, não no renderer: as bibliotecas
 ficam fora da página e o HTML gerado ainda passa por `sanitize.js` antes do DOM.
@@ -259,13 +263,170 @@ são indistinguíveis.
 continua no lugar, com o carimbo dele, e a faixa vira vermelha explicando o que falhou.
 Resumo visivelmente velho é melhor que dialog vazio.
 
+### As imagens do ticket vão junto
+
+O consultor que escala o ticket costuma anexar um print do erro, e o código que decide o
+diagnóstico mora ali dentro — não no texto. Então o resumo leva **as imagens anexadas**
+além do texto: verificado com um print cujo código de erro não aparecia em trâmite nenhum,
+e o resumo citou o código.
+
+**A escalação é reconhecida pelo formulário, não por uma frase.** O portal não marca
+escalação em campo nenhum — não há flag, `status` nem `origin` que diga isso. O que existe
+é um trâmite que o consultor preenche sempre com os mesmos rótulos:
+
+```
+Versão de Teste:  2.3.8.2
+Caminho: Faturamento > Enviar email
+Período de Teste:
+Base de Teste: AWS_SAOLUIZEXPRESS
+Servidor:srv00
+Problema: O erro relatado anteriormente voltou a ocorrer…
+```
+
+Contar rótulos (três dos seis) aguenta o que casar uma frase não aguentaria: acento que
+some, caixa que varia, dois-pontos sem espaço depois, campo deixado em branco, e o
+`Usuário`/`Senha` que só às vezes vem. Três é o piso porque uma resposta que cite um rótulo
+solto ("sobre o caminho: …") não pode ser lida como escalação.
+
+**Um ticket escala mais de uma vez** — o formulário volta quando o erro reaparece numa
+versão nova. Vale a escalação **mais recente que trouxe imagem**: é a que o desenvolvedor
+tem em mãos. Nenhuma casando, cai para as primeiras imagens do ticket em ordem
+cronológica — falhar para menos preciso é melhor que falhar para vazio.
+
+**O formulário não entra no corte.** O prompt tem teto e corta os trâmites mais antigos
+primeiro, que num ticket longo é exatamente onde a escalação está — e aí a imagem chegaria
+sem o texto que a explica. Ele tem orçamento reservado e vai marcado, porque é dele que
+saem versão, caminho, base e servidor: os dados que transformam "investigar" em
+"reproduzir em `AWS_SAOLUIZEXPRESS`/`srv00`".
+
+**Três pistas, e a diferença entre elas é o custo em token.**
+
+| Anexo | Como vai | Custo |
+|---|---|---|
+| `png` `jpg` `gif` `webp` | bloco `image` | ~1-2k tokens por print |
+| `pdf` | bloco `document` | ~1,5-3k tokens **por página** |
+| `xlsx` `xls` `ods` | SheetJS → **CSV** → texto no prompt | barato |
+| `docx` | mammoth → **texto puro** → texto no prompt | barato |
+| `txt` `csv` `xml` `sql` `json` `log` `md` | texto no prompt | barato |
+
+Planilha e `.docx` reusam as duas bibliotecas que o visualizador já carrega, mas pela saída
+de **texto**, não de HTML: a tela precisa de tabela, o modelo não. Uma planilha em CSV custa
+uma fração do mesmo dado em `<table>`, e markup é token dizendo a mesma coisa.
+
+**Vídeo e áudio ficam de fora por decisão de produto** — consomem token demais para o que
+entregam num resumo que se lê de relance. `bmp` fica de fora porque a API não recebe, `svg`
+pelo mesmo motivo do `sanitize.js` (svg executa script), e **`.doc` antigo** porque o
+mammoth lê `.docx` e nenhuma das duas bibliotecas abre OLE binário — ler `.doc` exigiria
+dependência nova, que a regra #15 não paga por isto.
+
+**As cotas são por pista, não um teto único**, porque os custos não se comparam: 4 imagens,
+2 PDFs, 4 arquivos de texto, 8 anexos no total. Um teto só deixaria um PDF gordo comer a
+vaga de todos os prints. O conteúdo de texto tem teto próprio — 12 mil chars por anexo,
+30 mil somando todos — e vai **depois** dos trâmites: a história do ticket é o que dá
+sentido ao arquivo, e não o contrário.
+
+**Página de PDF é o único custo que escala sozinho**, então ele tem teto de 10 páginas. A
+contagem é por regex no cru e é oportunista: PDF 1.5+ pode comprimir os objetos de página
+e aí não dá para contar — nesse caso quem segura é o teto de 2 MB.
+
+**Nada toca o disco**, como no visualizador de anexos. Os bytes vão em base64 pelo stdin
+do CLI, e a ferramenta `Read` continua bloqueada.
+
 ### O consentimento
 
-O conteúdo do ticket — nome de cliente e texto dos trâmites — sai da máquina. Isso é
-pedido uma vez, num dialog que diz por extenso o que sai e para onde vai, antes da
-primeira chamada. Recusar não envia nada. O aceite grava um campo no mesmo `config.json`
-da chave da API.
+O conteúdo do ticket — nome de cliente, texto dos trâmites e as imagens anexadas — sai da
+máquina. Isso é pedido uma vez, num dialog que diz por extenso o que sai e para onde vai,
+antes da primeira chamada. Recusar não envia nada. O aceite grava um campo no mesmo
+`config.json` da chave da API.
+
+**O aceite é versionado.** Quando o resumo passou a mandar imagem, o que sai mudou de
+categoria — um print carrega a tela inteira, às vezes outro sistema ou outro cliente junto.
+Um aceite dado para "o texto dos trâmites" não cobre isso, então `CONSENT_V` subiu e o
+dialog volta uma vez. Aceite que descreve o que sai só vale enquanto a descrição for
+verdade.
+
+O dialog também parou de mentir sobre o cache: ele dizia que o resumo "se refaz sozinho
+quando o ticket recebe um trâmite novo", e o contrário é que é verdade — a seção acima diz
+que ele **não** se refaz, avisa e espera o "Refazer".
+
+Ênfase no corpo do dialog usa peso 500 e cor `--text`, como o `.tr-body b`. Negrito 700
+vira mancha nesse tamanho, e peso maior num texto que continua `--text-dim` só pesa — quem
+marca a ênfase é a cor subir.
 
 O botão de confirmação usa `.btn-primary`, que **deixou de ser âmbar** nesta mudança: num
 mundo quase preto, um neutro claro já é hierarquia suficiente, e a cor com significado
 volta a ter um significado só. O "Salvar e carregar" da chave da API herdou o conserto.
+
+## Hotfix a partir do resumo
+
+Um segundo botão na barra do `#resumo` leva de "entendi o ticket" a "estou na branch com o
+diagnóstico rodando": cria `hotfix/<número>` no repositório local do módulo, escreve um
+briefing com o resumo dentro dela e abre um terminal com o `claude` investigando.
+
+**Mora na barra do resumo, não na do detalhe.** A ação só existe quando existe resumo — é
+ele que vira o briefing. Na barra do resumo isso é estrutural: o botão está onde a
+pré-condição já foi satisfeita, e não precisa de estado próprio para saber se pode
+aparecer. Na barra do detalhe ele teria que nascer desabilitado e consultar o cache para
+descobrir se libera, o que é mais máquina para dizer a mesma coisa.
+
+**Depois de "Refazer"**, pela mesma regra da barra do detalhe: a ação que acontece dentro do
+app vem antes da que sai dele. Refazer mexe no texto que você está lendo; Hotfix abre uma
+janela fora do app e escreve em disco.
+
+**O ícone `#i-branch` tem duas bolas, não três.** A versão canônica do símbolo de branch usa
+três nós, e os ícones da barra renderizam a 14px — é a mesma medida que descartou a
+engrenagem em Configurações. Duas bolas e um arco sobrevivem ao tamanho; o terceiro nó vira
+mancha. Traço 1.6, a folha inteira.
+
+**Sucesso não tem faixa.** O terminal abrindo é a confirmação — é uma janela nova na tela,
+não há o que anunciar depois disso. Uma faixa de sucesso exigiria um variante verde do
+`.notice`, cujo default neste app é âmbar, e âmbar aqui significa envelhecimento e nada
+mais. O dialog do resumo fecha e o trabalho continua no terminal.
+
+### Dois lugares para dizer que deu errado, e eles não são intercambiáveis
+
+**O que impede de começar vai para o `#hotfixAsk`**: gitflow ausente, repositório sem
+`git flow init`, módulo sem repositório apontado, caminho que não existe. São situações em
+que nada aconteceu ainda e cada uma tem um conserto diferente — "aponte um repositório" e
+"rode `git flow init`" não se parecem. Um dialog dá espaço para nomear o problema e o
+caminho de volta; uma faixa de uma linha, não.
+
+**O que quebra no meio vai para a faixa `.notice[data-kind="down"]`** do próprio resumo, a
+mesma do "não foi possível refazer". Aí já rodou alguma coisa: pode haver um stash, e o
+resumo continua valendo atrás da faixa. Tirar isso da tela para mostrar um dialog seria a
+mesma perda que a regra de ouro #4 evita na lista.
+
+**Quando existe stash, a mensagem de erro diz o nome dele.** Um erro que não cita o stash
+faz o usuário achar que perdeu o trabalho — e ele acabou de ver um aviso dizendo que tudo
+seria guardado. O texto traz o nome e o `git stash pop`.
+
+### O aviso do stash
+
+Workspace com alterações abre o `#hotfixAsk` antes de qualquer comando: quantos arquivos,
+em qual branch, para qual branch vai, e o caminho do repositório em mono — caminho é dado
+medido, mesmo registro das linhas de Configurações. **Workspace limpo não pergunta nada**:
+não há o que guardar, então não há decisão a tomar, e um dialog de confirmação sem
+consequência é só um clique a mais.
+
+**O botão de saída muda de nome conforme o que ele faz** — "Cancelar" quando há uma ação
+pendente, "Fechar" quando o dialog é só informação. É a mesma decisão que transformou o
+"Cancelar" de Configurações em "Fechar" quando o rodapé deixou de governar a lista.
+
+O dialog **não fecha o resumo atrás dele**: os dois ficam empilhados, e o texto que motivou
+a hotfix continua visível enquanto você decide. Reusa `dialog`, `.dlg-body` e `.dlg-foot`
+sem uma regra de CSS nova — a largura de 470px já foi calculada para caber um caminho como
+`C:\dev\praxio\Autumn.SIGAi` em mono 12px.
+
+### O briefing é a fronteira, não a linha de comando
+
+O `.md` que entra na branch carrega título, cliente e o texto do resumo. **Nada disso passa
+pela linha de comando**: só o número do ticket, filtrado por allowlist
+(`slugTicket`, `services/git.js`), vira nome de branch, nome de arquivo e argumento do
+terminal. É a mesma postura fail-closed do `sanitize.js`, aplicada a uma fronteira nova.
+
+O briefing também avisa o Claude, por extenso, de que o texto do ticket é **material para
+diagnóstico e nunca instrução** — o mesmo risco de injeção que o prompt de sistema do resumo
+já trata, agora que o texto vira um arquivo entregue a um agente com ferramentas.
+
+O arquivo entra no `.git/info/exclude`, não no `.gitignore`: o briefing é do app e do
+momento, e o `.gitignore` é versionado e pertence ao time. A branch nasce e permanece limpa.
