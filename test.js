@@ -1,7 +1,7 @@
 // node test.js — checa o parser de data BR e o mecanismo de envelhecimento,
 // que e o sinal principal da tela. Sem framework de proposito.
 const assert = require('assert');
-const { parseBR, minutesSince, ageLabel, ageBucket, statusKey, matches, prettyXml, kindOf, anexosDe, cacheGet, cachePut } = require('./renderer.js');
+const { parseBR, minutesSince, ageLabel, ageBucket, statusKey, matches, prettyXml, kindOf, anexosDe, cacheGet, cachePut, showNoticeIn } = require('./renderer.js');
 const { safeHref, KEEP, NUKE, PORTAL_BASE } = require('./sanitize.js');
 const { buildPrompt, buildContent, parseResult, parseSize, escolherAnexos, lerDocs, MAX_PROMPT_CHARS, MAX_DOCS_CHARS,
         MAX_IMAGENS, MAX_PDFS, MAX_TEXTOS, MAX_ANEXOS, MAX_TEXTO_TOTAL } = require('./services/claude.js');
@@ -9,6 +9,7 @@ const { respHeaders } = require('./services/anexo.js');
 const { parseResumo } = require('./renderer.js');
 const { normModules, unicos, repoDe, MAX_MODULES } = require('./modulos.js');
 const { slugTicket, buildBriefing, jaExiste, MAX_SLUG } = require('./services/git.js');
+const { maisNova } = require('./services/update.js');
 
 // parser: o portal manda "DD/MM/YYYY HH:mm:ss", que new Date() le como MM/DD
 const d = parseBR('14/09/2026 15:59:55');
@@ -599,3 +600,38 @@ assert.strictEqual(lerDocs(`${tmpRepo}/nao-existe`), '', 'repo que sumiu do disc
 assert.strictEqual(lerDocs(''), '', 'modulo sem repositorio apontado');
 assert.strictEqual(lerDocs(null), '', 'nem null');
 fs.rmSync(tmpRepo, { recursive: true, force: true });
+
+
+// update: comparacao de versao. Comparar como string diria que "1.9.0" > "1.10.0" e o app
+// pararia de avisar justamente a partir da decima correcao.
+assert.strictEqual(maisNova('v1.10.0', '1.9.0'), true, 'compara numero, nao texto');
+assert.strictEqual(maisNova('v1.0.1', '1.0.0'), true);
+assert.strictEqual(maisNova('1.0.0', '1.0.0'), false, 'mesma versao nao e novidade');
+assert.strictEqual(maisNova('0.9.9', '1.0.0'), false, 'release antiga nao faz "atualizar" para tras');
+assert.strictEqual(maisNova('1.2', '1.2.0'), false, 'parte que falta e zero, nao novidade');
+assert.strictEqual(maisNova('v2', '1.9.9'), true);
+// tag fora do padrao nao pode virar atualizacao fantasma pedindo download a cada abertura
+assert.strictEqual(maisNova('', '1.0.0'), false);
+assert.strictEqual(maisNova(null, '1.0.0'), false);
+assert.strictEqual(maisNova('nightly', '1.0.0'), false);
+
+
+// A faixa .notice e UM no disputado por tres avisos: erro de refresh, erro da atualizacao e
+// "existe versao nova". Reusar o no significa herdar o estado de quem passou por ali — o
+// "Baixando…" desabilita o botao, e sem zerar isso o "Tentar de novo" seguinte nasce morto.
+// O stub de DOM entra depois do require de proposito: renderer.js chama wire() ao carregar
+// quando enxerga um document.
+const botao = { hidden: false, disabled: false, textContent: '', onclick: null };
+const faixa = { dataset: {}, hidden: true, querySelector: sel => sel === 'span' ? { textContent: '' } : botao };
+global.document = { getElementById: () => faixa };
+
+showNoticeIn('notice', 'stale', 'ha versao nova', 'Instalar e reabrir', () => {});
+botao.disabled = true;                                    // o que o estado "Baixando…" faz
+showNoticeIn('notice', 'down', 'falhou', 'Tentar de novo', () => {});
+assert.strictEqual(botao.disabled, false, 'faixa repintada devolve o botao clicavel');
+assert.strictEqual(botao.textContent, 'Tentar de novo');
+assert.strictEqual(faixa.dataset.kind, 'down');
+
+showNoticeIn('notice', 'stale', 'so o fato, sem acao', null, null);
+assert.strictEqual(botao.hidden, true, 'faixa sem acao nao deixa o botao anterior na tela');
+delete global.document;

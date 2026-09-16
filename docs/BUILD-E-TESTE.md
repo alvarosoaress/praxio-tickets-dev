@@ -139,6 +139,38 @@ O primeiro `npm run dist` baixa o binário do Electron e o cache do `winCodeSign
 
 ---
 
+## Publicar uma versão
+
+O app checa `releases/latest` do repositório a cada abertura e oferece a troca do `.exe`
+(`services/update.js`). Três coisas precisam ser verdade, e nenhuma delas é automática:
+
+1. **`version` do `package.json` subiu.** É ela que vira `app.getVersion()` e é com ela que
+   a tag é comparada. Versão parada = ninguém recebe nada.
+2. **A tag da release é a mesma versão**, com ou sem `v` (`v1.1.0` ou `1.1.0`). A comparação
+   é numérica campo a campo — `1.10.0` é maior que `1.9.0`.
+3. **O `.exe` está anexado à release.** Release sem asset `.exe` é ignorada de propósito:
+   avisar de uma versão que não dá para instalar só produz um botão que falha.
+
+```bash
+npm version patch --no-git-tag-version   # ou minor/major — só mexe no package.json
+npm run dist
+gh release create v1.1.0 "dist/Tickets 1.1.0.exe" --title v1.1.0 --notes "..."
+```
+
+O download só aceita URL sob
+`https://github.com/alvarosoaress/praxio-tickets-dev/releases/download/` — o endereço vem do
+JSON do GitHub e o que se faz com esses bytes é executar. Renomear o repositório ou movê-lo
+para outro dono quebra a atualização, e a constante em `services/update.js` é o único lugar
+a corrigir.
+
+**O repositório precisa continuar público.** Não há token no `.exe` e não vai haver: a
+alternativa seria embutir credencial num binário que circula entre máquinas.
+
+⚠️ **Só se atualiza quem já está numa versão que tem esta feature.** Quem estiver num `.exe`
+anterior a ela não checa nada — esse `.exe` precisa ser substituído na mão, uma última vez.
+
+---
+
 ## Verificação manual
 
 O que os testes não cobrem, e que vale repassar antes de distribuir um `.exe`:
@@ -153,6 +185,7 @@ O que os testes não cobrem, e que vale repassar antes de distribuir um `.exe`:
 - [ ] Rodapé "Visto por" visível sem rolar; expande e tem scroll próprio.
 - [ ] Um anexo de cada família: imagem (zoom/arrasto), PDF (renderiza, **não** baixa), planilha (abas), docx, xml (indentado), sql (acentos corretos), zip (mensagem de sem preview).
 - [ ] Rodar o `.exe` numa pasta limpa e repetir os três últimos itens — é onde `node_modules` faltando aparece.
+- [ ] Com uma release nova publicada: abrir o `.exe`, faixa âmbar no topo com as duas versões, "Instalar e reabrir" baixa, o app fecha e volta na versão nova — e o `.old` ao lado some na abertura seguinte.
 
 ---
 

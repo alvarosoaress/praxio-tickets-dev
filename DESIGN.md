@@ -430,3 +430,57 @@ já trata, agora que o texto vira um arquivo entregue a um agente com ferramenta
 
 O arquivo entra no `.git/info/exclude`, não no `.gitignore`: o briefing é do app e do
 momento, e o `.gitignore` é versionado e pertence ao time. A branch nasce e permanece limpa.
+
+## Atualização pelo GitHub
+
+Quando existe uma release mais nova que este `.exe`, uma faixa aparece no topo da lista com
+um botão que baixa a versão nova, troca o binário no lugar e reabre o app. A checagem
+acontece uma vez por abertura, e **sem novidade a tela não muda** — nada de "você está
+atualizado", que é um aviso que ninguém pediu ocupando o topo da tela o dia inteiro.
+
+**Reusa a faixa `.notice` da lista: nenhum markup novo, nenhuma regra de CSS nova.** O nó já
+existe, já tem o par texto + botão, e já é o lugar onde este app diz "algo que você deveria
+saber, sem te impedir de trabalhar".
+
+**Âmbar, e esta é a segunda e última extensão da mesma leitura.** A regra de ouro #7 reserva
+`--amber` para envelhecimento, e o resumo desatualizado já esticou isso para "o que você está
+vendo é velho". Um app atrás da release é literalmente o mesmo formato: existe algo mais novo
+do que o que está na sua frente. O que continua proibido é âmbar como ênfase — "importante",
+"novo", "clique aqui". Inventar um variante verde ou azul para esta faixa estava fora de
+questão pelo mesmo motivo que o sucesso da hotfix não tem faixa: são dois variantes, e cada
+cor a mais apaga a que já significava alguma coisa.
+
+**A faixa é um nó só e três avisos a disputam** — erro de refresh, erro da atualização e
+"existe versão nova". A precedência não é arbitrária: **o que acabou de acontecer ganha a
+vez**. Erro é evento, e evento perde a chance se não for visto agora; "existe versão nova"
+não é evento, é um fato que continua verdade — então ele volta sozinho no próximo `load`
+limpo, sem nada para reafirmá-lo. Uma versão nova é, de longe, a coisa menos urgente que
+pode aparecer nesta tela.
+
+**O botão chama "Instalar e reabrir", não "Atualizar".** Duas razões, e as duas são dele:
+"Atualizar" já é o nome do botão da barra 40px acima, que recarrega a lista — dois controles
+com o mesmo nome e consequências incomparáveis na mesma tela. E o app **se fecha sozinho** no
+fim da troca; descobrir isso depois do clique seria susto. O rótulo carrega o aviso, o que é
+melhor que uma frase avisando sobre o clique — a faixa continua com uma linha.
+
+**Baixando é rótulo, não barra.** O `.exe` tem ~97 MB e a espera pode passar de um minuto. O
+botão troca para "Baixando…" e desabilita, exatamente como o "Atualizando…" da lista e o
+"Resumindo…" do resumo — é a palavra que este app já usa para espera longa. Porcentagem
+exigiria download em stream com evento de progresso atravessando o IPC, e a `.loadbar` do
+topo é governada pelo fetch da lista, que continua rodando a cada 60s por baixo: as duas
+disputariam o mesmo nó. Se um dia a troca falhar por rede lenta a ponto de alguém matar o
+app achando que travou, é aí que a porcentagem se paga.
+
+**Sucesso não tem faixa**, pela mesma razão do terminal da hotfix: o app fechar e reabrir na
+versão nova é a confirmação. A falha vai para o variante vermelho com "Tentar de novo",
+porque nada foi trocado no disco e a lista atrás continua válida — a mesma divisão da regra
+de ouro #4.
+
+**A faixa diz as duas versões** ("Versão 1.1.0 disponível — esta é a 1.0.0."). É o único
+lugar do app que mostra a versão, e de propósito: uma linha "Versão" em Configurações seria
+uma terceira seção que se lê uma vez na vida, enquanto aqui o número aparece exatamente no
+momento em que ele significa alguma coisa — quando está atrasado.
+
+**Rodando de `npm start` a faixa nunca aparece.** Não há `.exe` para trocar, e quem roda do
+repositório atualiza com `git pull`. Um botão que não tem o que fazer é pior que botão
+nenhum.

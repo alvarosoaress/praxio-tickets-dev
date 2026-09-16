@@ -170,13 +170,17 @@ function showNoticeIn(id, kind, text, actionLabel, onAction) {
   n.querySelector('span').textContent = text;
   const b = n.querySelector('button');
   b.hidden = !actionLabel;
+  b.disabled = false;   // a faixa e reusada: quem desabilitou o botao antes nao pode prender o proximo
   if (actionLabel) {
     b.textContent = actionLabel;
     b.onclick = onAction;
   }
 }
 
-const clearNotice = () => { $('notice').hidden = true; };
+// A faixa e um no so e tres coisas a disputam: erro de refresh, erro da atualizacao e
+// "existe versao nova". O que acabou de acontecer ganha a vez — mas o aviso de versao nao e
+// um evento, e um fato que continua verdade, entao ele volta sozinho no proximo load limpo.
+const clearNotice = () => { novaVersao ? showUpdate() : ($('notice').hidden = true); };
 
 const wrap = (cls, child) => { const n = el('div', cls); n.appendChild(child); return n; };
 
@@ -851,6 +855,49 @@ function hotfixFalhou(res) {
   showNoticeIn('resumoNotice', 'down', 'Não foi possível criar a hotfix: ' + res.error + onde);
 }
 
+/* ---------- atualizacao ---------- */
+
+let novaVersao = null;   // { version, local, url } enquanto houver release mais nova
+let baixando = false;
+
+// Faixa ambar, o mesmo variante do resumo desatualizado: neste app ambar significa "o que
+// voce esta vendo e velho", e um app atras da release e exatamente isso. Diz as duas
+// versoes porque o app nao mostra a propria em lugar nenhum — "1.1.0 disponivel" sozinho
+// nao responde o quanto ficou para tras.
+function showUpdate() {
+  if (!novaVersao) return;
+  showNotice('stale', `Versão ${novaVersao.version} disponível — esta é a ${novaVersao.local}.`,
+    baixando ? 'Baixando…' : 'Instalar e reabrir', aplicarUpdate);
+  $('noticeAction').disabled = baixando;
+}
+
+// O rotulo diz que o app vai fechar, em vez de uma frase avisando disso: o .exe tem ~97 MB,
+// a espera e de um minuto e o app se fecha sozinho no fim. Descobrir isso depois do clique
+// seria susto. "Atualizar" esta fora de cogitacao — e o nome do botao da barra, 40px acima,
+// que recarrega a lista.
+async function aplicarUpdate() {
+  if (baixando) return;
+  baixando = true;
+  showUpdate();
+
+  const res = await window.api.updateApply(novaVersao.url);
+  baixando = false;
+
+  // Sucesso nao tem faixa: o app fecha e reabre sozinho, e isso e a confirmacao.
+  if (res.error) showNotice('down', 'Não foi possível atualizar: ' + res.error, 'Tentar de novo', aplicarUpdate);
+  else showUpdate();
+}
+
+// Uma vez por abertura. Sem release, sem rede ou sem novidade a tela nao muda: a checagem
+// nao pode custar nada a quem so quer ver os tickets. E nao pinta por cima de uma faixa que
+// ja esta na tela — quem estava ali e mais urgente, e o aviso volta no proximo load limpo.
+async function checkUpdate() {
+  const res = await window.api.updateCheck();
+  if (res.error || res.atual || !res.url) return;
+  novaVersao = res;
+  if ($('notice').hidden) showUpdate();
+}
+
 /* ---------- carga ---------- */
 
 function setLoading(on) {
@@ -1229,7 +1276,8 @@ setInterval(() => { if (tickets && tickets.length && !loading) render(); }, AGE_
 timer = setInterval(load, REFRESH_MS);
 
 load();
+checkUpdate();
 }
 
 if (typeof document !== 'undefined') wire();
-if (typeof module !== 'undefined') module.exports = { parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf, parseResumo, anexosDe, cacheGet, cachePut };
+if (typeof module !== 'undefined') module.exports = { parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf, parseResumo, anexosDe, cacheGet, cachePut, showNoticeIn };

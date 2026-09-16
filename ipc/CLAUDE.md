@@ -10,6 +10,7 @@ A fronteira com o renderer. Um arquivo por domínio, cada um exportando `registe
 | `anexos.js`  | `anexo-text`, `anexo-html` + `registerProtocol()` |
 | `resumo.js`  | `resumo`                                         |
 | `hotfix.js`  | `hotfix-probe`, `hotfix-start`                    |
+| `update.js`  | `update-check`, `update-apply`                   |
 
 `registerProtocol()` é a exceção: precisa rodar **dentro** do `whenReady`. O
 `registerSchemesAsPrivileged` que ele exige fica em `main.js`, no escopo de módulo, porque

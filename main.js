@@ -8,6 +8,7 @@ const ipcTickets = require('./ipc/tickets');
 const ipcAnexos = require('./ipc/anexos');
 const ipcResumo = require('./ipc/resumo');
 const ipcHotfix = require('./ipc/hotfix');
+const ipcUpdate = require('./ipc/update');
 const { attachDevLog } = require('./services/devlog');
 
 // anexo://<id> serve os bytes do anexo vindos da API. Assim <img>, <video> e o
@@ -23,6 +24,7 @@ ipcTickets.register();
 ipcAnexos.register();
 ipcResumo.register();
 ipcHotfix.register();
+ipcUpdate.register();
 
 app.whenReady().then(() => {
   ipcAnexos.registerProtocol();

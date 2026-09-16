@@ -55,8 +55,8 @@ arquivo único, a doc dela mora em `docs/`.
 | Arquivo       | Papel                                                                                                          |
 | ------------- | -------------------------------------------------------------------------------------------------------------- |
 | `main.js`     | Só o arquivo principal: registra o scheme, liga os módulos de IPC, abre a janela. ~40 linhas                   |
-| `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`, `git`                     |
-| `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`, `hotfix`                                 |
+| `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`, `git`, `update`           |
+| `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`, `hotfix`, `update`                       |
 | `preload.js`  | Ponte `contextBridge`. 15 funções, nada além disso                                                             |
 | `renderer.js` | Toda a UI: lista, detalhe, filtros, visualizador de anexo, estados de erro                                     |
 | `modulos.js`  | `normModules()`: código de módulo do portal. Puro, como o `sanitize.js`                                        |
@@ -197,8 +197,11 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Terminal da hotfix abre e fecha na hora         | `claude` não está no PATH. O `cmd /k` segura a janela para o erro ficar legível |
 | Minhas alterações sumiram depois da hotfix      | Estão no stash, com o número do ticket na mensagem. `git stash list` → `git stash pop` |
 | `TICKET-<n>.md` aparece no `git status`         | O append no `.git/info/exclude` falhou. É só ruído — o arquivo pode ser apagado |
-| Resumo some ao reabrir o app                    | `%APPDATA%	ickets
-esumos.json` não gravou. Apagar o arquivo é seguro — só perde cache |
+| A faixa de "versão nova" nunca aparece          | Ela só existe no `.exe` portátil e só com release publicada **com o `.exe` anexado** e tag maior que a `version` do `package.json` — ver [`docs/BUILD-E-TESTE.md`](docs/BUILD-E-TESTE.md). Por `npm start` ela nunca aparece, de propósito |
+| Atualizar falha com `EPERM` / `EACCES`          | O `.exe` está numa pasta onde o usuário não escreve (`Arquivos de Programas`). A troca renomeia e grava ao lado — portátil precisa morar onde se escreve |
+| Sobrou um `Tickets.exe.old` ao lado do `.exe`   | Resto da troca: o binário antigo só pode ser apagado depois que aquele processo morreu, então some na abertura seguinte (`limparAntigo`). Apagar na mão é seguro |
+| Atualizou e as configurações sumiram            | Não é a atualização: config e resumos vivem em `%APPDATA%\tickets`, e a troca só mexe no `.exe` |
+| Resumo some ao reabrir o app                    | `%APPDATA%\tickets\resumos.json` não gravou. Apagar o arquivo é seguro — só perde cache |
 
 ---
 
