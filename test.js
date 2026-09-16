@@ -1,7 +1,7 @@
 // node test.js — checa o parser de data BR e o mecanismo de envelhecimento,
 // que e o sinal principal da tela. Sem framework de proposito.
 const assert = require('assert');
-const { parseBR, minutesSince, ageLabel, ageBucket, statusKey, matches, prettyXml, kindOf, anexosDe, cacheGet, cachePut, showNoticeIn } = require('./renderer.js');
+const { ticketsNovos, parseBR, minutesSince, ageLabel, ageBucket, statusKey, matches, prettyXml, kindOf, anexosDe, cacheGet, cachePut, showNoticeIn } = require('./renderer.js');
 const { safeHref, KEEP, NUKE, PORTAL_BASE } = require('./sanitize.js');
 const { buildPrompt, buildContent, parseResult, parseSize, escolherAnexos, lerDocs, MAX_PROMPT_CHARS, MAX_DOCS_CHARS,
         MAX_IMAGENS, MAX_PDFS, MAX_TEXTOS, MAX_ANEXOS, MAX_TEXTO_TOTAL } = require('./services/claude.js');
@@ -614,6 +614,14 @@ assert.strictEqual(maisNova('v2', '1.9.9'), true);
 assert.strictEqual(maisNova('', '1.0.0'), false);
 assert.strictEqual(maisNova(null, '1.0.0'), false);
 assert.strictEqual(maisNova('nightly', '1.0.0'), false);
+
+// Notificacao de ticket novo: quem decide e a diferenca entre duas cargas, por numero.
+const fila = [{ number: '938963' }, { number: '939001' }];
+assert.deepStrictEqual(ticketsNovos(null, fila), [], 'primeira carga nunca notifica a fila inteira');
+assert.strictEqual(ticketsNovos(fila, fila).length, 0, 'mesma fila nao gera toast a cada refresh');
+assert.deepStrictEqual(ticketsNovos(fila, [...fila, { number: '939100' }]).map(t => t.number), ['939100']);
+assert.strictEqual(ticketsNovos(fila, []).length, 0, 'ticket que saiu da fila nao e novidade');
+assert.strictEqual(ticketsNovos([], fila).length, 2, 'fila vazia que recebe tickets notifica');
 
 
 // A faixa .notice e UM no disputado por tres avisos: erro de refresh, erro da atualizacao e

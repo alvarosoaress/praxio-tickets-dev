@@ -30,8 +30,13 @@
       "node_modules/**/*"
     ],
     "win": {
-      "target": "portable"
-    }
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "electronLanguages": ["pt-BR", "en-US"]
   },
   "dependencies": {
     "mammoth": "^1.12.3",

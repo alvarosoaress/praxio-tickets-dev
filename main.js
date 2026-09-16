@@ -26,6 +26,9 @@ ipcResumo.register();
 ipcHotfix.register();
 ipcUpdate.register();
 
+// Sem AppUserModelID o Windows nao sabe de quem e o toast e some com ele sem tocar som.
+app.setAppUserModelId('com.alvaro.tickets');
+
 app.whenReady().then(() => {
   ipcAnexos.registerProtocol();
 

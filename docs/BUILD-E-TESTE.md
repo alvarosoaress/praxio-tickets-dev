@@ -12,7 +12,7 @@
 | `npm install` | Instala Electron, electron-builder, xlsx e mammoth |
 | `npm start` | Abre o app contra a API de produção |
 | `npm test` | Roda `test.js`. Deve imprimir `ok` e sair com 0 |
-| `npm run dist` | Gera `dist/Tickets 1.0.0.exe` (~97 MB, portátil) |
+| `npm run dist` | Gera `dist/Tickets Setup 1.0.0.exe` (~105 MB, instalador one-click) |
 
 Primeira execução pede a chave da API. Ela fica em `%APPDATA%\tickets\config.json` e
 sobrevive a reinstalação — inclusive entre `npm start` e o `.exe`, porque o Windows trata
@@ -112,8 +112,11 @@ Config dentro do `package.json`, sem arquivo separado:
   "appId": "com.alvaro.tickets",
   "productName": "Tickets",
   "files": ["main.js", "preload.js", "index.html", "renderer.js",
-            "sanitize.js", "style.css", "node_modules/**/*"],
-  "win": { "target": "portable" }
+            "sanitize.js", "modulos.js", "services/**/*", "ipc/**/*",
+            "style.css", "node_modules/**/*"],
+  "win": { "target": "nsis" },
+  "nsis": { "oneClick": true, "perMachine": false },
+  "electronLanguages": ["pt-BR", "en-US"]
 }
 ```
 
@@ -131,8 +134,16 @@ grep -E "node_modules.(xlsx|mammoth).package[.]json$" /tmp/asar.txt
 Esperado: ~950 entradas, incluindo `\node_modules\xlsx\xlsx.js`. O `asar list` imprime com
 barra invertida no Windows — grep com `/` não casa nada e dá falso negativo.
 
-`target: "portable"` gera um `.exe` autoextraível, sem instalador e sem entrada no menu
-iniciar. Trocar para `"nsis"` só se alguém quiser instalação de verdade.
+`target: "nsis"` gera um instalador one-click: sem tela de opções, sem admin, instala em
+`%LOCALAPPDATA%\Programs\Tickets` e cria atalho.
+
+⚠️ **Não voltar para `"portable"`.** O `portable.nsi` do electron-builder apaga e re-extrai
+o app inteiro (~380 MB) no `%TEMP%` a cada abertura, e apaga de novo ao fechar — são dois
+`RMDir /r` no mesmo template, então não existe cache e `unpackDirName` não ajuda. Eram ~10 s
+por abertura, num app que fica aberto o dia inteiro num segundo monitor.
+
+`electronLanguages` reduz os 55 `.pak` de `locales/` a dois (49 MB → 1,3 MB). A UI é só
+pt-BR; `en-US` fica porque é o fallback do Chromium.
 
 O primeiro `npm run dist` baixa o binário do Electron e o cache do `winCodeSign`
 (algumas centenas de MB, uma vez só).
@@ -140,6 +151,13 @@ O primeiro `npm run dist` baixa o binário do Electron e o cache do `winCodeSign
 ---
 
 ## Publicar uma versão
+
+⚠️ **Dormente desde a troca para `nsis`.** O código continua todo aqui, mas `exePath()`
+(`services/update.js:39`) depende de `PORTABLE_EXECUTABLE_FILE`, que só o launcher portable
+exportava — sem ela `checar()` sai em `{ atual: true }` e nada chega à tela. Hoje se atualiza
+enviando o Setup novo, que instala por cima e não toca em `%APPDATA%\tickets`. Para reativar:
+abrir a `page` da release no browser em vez de trocar os bytes do `.exe` — `checar()` já
+devolve esse campo. O resto da seção descreve o mecanismo como ele fica quando ligado.
 
 O app checa `releases/latest` do repositório a cada abertura e oferece a troca do `.exe`
 (`services/update.js`). Três coisas precisam ser verdade, e nenhuma delas é automática:
@@ -154,7 +172,7 @@ O app checa `releases/latest` do repositório a cada abertura e oferece a troca 
 ```bash
 npm version patch --no-git-tag-version   # ou minor/major — só mexe no package.json
 npm run dist
-gh release create v1.1.0 "dist/Tickets 1.1.0.exe" --title v1.1.0 --notes "..."
+gh release create v1.1.0 "dist/Tickets Setup 1.1.0.exe" --title v1.1.0 --notes "..."
 ```
 
 O download só aceita URL sob
@@ -184,8 +202,8 @@ O que os testes não cobrem, e que vale repassar antes de distribuir um `.exe`:
 - [ ] Abrir um ticket: trâmites do mais recente para o mais antigo, badge de origem colorido.
 - [ ] Rodapé "Visto por" visível sem rolar; expande e tem scroll próprio.
 - [ ] Um anexo de cada família: imagem (zoom/arrasto), PDF (renderiza, **não** baixa), planilha (abas), docx, xml (indentado), sql (acentos corretos), zip (mensagem de sem preview).
-- [ ] Rodar o `.exe` numa pasta limpa e repetir os três últimos itens — é onde `node_modules` faltando aparece.
-- [ ] Com uma release nova publicada: abrir o `.exe`, faixa âmbar no topo com as duas versões, "Instalar e reabrir" baixa, o app fecha e volta na versão nova — e o `.old` ao lado some na abertura seguinte.
+- [ ] Instalar de verdade numa máquina limpa e repetir os três últimos itens — é onde `node_modules` faltando aparece.
+- [ ] Instalar por cima de uma versão anterior: chave, repositórios e resumos continuam lá.
 
 ---
 

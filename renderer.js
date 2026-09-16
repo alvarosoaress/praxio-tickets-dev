@@ -908,6 +908,24 @@ function setLoading(on) {
   $('refresh').querySelector('svg').classList.toggle('spin', on);
 }
 
+// Ticket novo = numero que nao estava na carga anterior. A primeira carga (prev null) nunca
+// notifica: a fila inteira seria "nova" toda vez que o app abre. Um refresh que falha nao
+// mexe em `tickets`, entao ele tambem nao inventa novidade na carga seguinte.
+const ticketsNovos = (prev, next) => {
+  if (!prev) return [];
+  const vistos = new Set(prev.map(t => t.number || t.link));
+  return (next || []).filter(t => !vistos.has(t.number || t.link));
+};
+
+// O som e o do toast do Windows — a tela vive num segundo monitor, o aviso precisa ser
+// audivel. Nao passa pela regra #8: isso nao e movimento na tela, e notificacao do SO.
+function notificar(novos) {
+  for (const t of novos) {
+    new Notification('Ticket novo · ' + (t.number || '—'),
+      { body: [t.client, t.title].filter(Boolean).join(' — ') });
+  }
+}
+
 async function load() {
   if (loading) return;
   setLoading(true);
@@ -919,6 +937,7 @@ async function load() {
   if (res.error) return onError(res.error, res.status);
 
   clearNotice();
+  notificar(ticketsNovos(tickets, res.tickets));
   tickets = res.tickets;
   loadedAt = new Date();
   $('updated').textContent = 'atualizado ' + loadedAt.toLocaleTimeString('pt-BR');
@@ -1280,4 +1299,4 @@ checkUpdate();
 }
 
 if (typeof document !== 'undefined') wire();
-if (typeof module !== 'undefined') module.exports = { parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf, parseResumo, anexosDe, cacheGet, cachePut, showNoticeIn };
+if (typeof module !== 'undefined') module.exports = { ticketsNovos, parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf, parseResumo, anexosDe, cacheGet, cachePut, showNoticeIn };

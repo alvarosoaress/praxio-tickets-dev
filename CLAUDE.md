@@ -18,7 +18,7 @@ cliente dela.
 | ------------- | ----------------------------------- | --------------------------------------------------------------------------------------- |
 | Shell         | Electron 44                         | Precisa de processo privilegiado para guardar a chave e fazer proxy de bytes            |
 | Renderer      | HTML + CSS + JS puro                | Sem bundler, sem framework, sem CDN. O app tem sete arquivos; um build step não se paga |
-| Empacotamento | electron-builder, target `portable` | Um devDep, config dentro do `package.json`, `.exe` único                                |
+| Empacotamento | electron-builder, target `nsis`     | Um devDep, config dentro do `package.json`, instalador one-click por usuário            |
 | Runtime deps  | `xlsx` (SheetJS), `mammoth`         | Únicos dois. Convertem planilha e `.docx` para HTML **no processo main**                |
 | Testes        | `node test.js` + `assert`           | Sem framework. Cobre só a lógica pura que quebra em silêncio                            |
 
@@ -32,7 +32,7 @@ cliente dela.
 npm install
 npm start          # abre o app contra a API de produção
 npm test           # checa parser de data, envelhecimento, filtro, sanitizador, XML
-npm run dist       # gera dist/Tickets 1.0.0.exe (portátil, ~97 MB)
+npm run dist       # gera dist/Tickets Setup 1.0.0.exe (instalador one-click, ~105 MB)
 ```
 
 Primeira execução pede a chave da API (104 caracteres), guardada em
@@ -199,11 +199,11 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Terminal da hotfix abre e fecha na hora         | `claude` não está no PATH. O `cmd /k` segura a janela para o erro ficar legível |
 | Minhas alterações sumiram depois da hotfix      | Estão no stash, com o número do ticket na mensagem. `git stash list` → `git stash pop` |
 | `TICKET-<n>.md` aparece no `git status`         | O append no `.git/info/exclude` falhou. É só ruído — o arquivo pode ser apagado |
-| A faixa de "versão nova" nunca aparece          | Ela só existe no `.exe` portátil e só com release publicada **com o `.exe` anexado** e tag maior que a `version` do `package.json` — ver [`docs/BUILD-E-TESTE.md`](docs/BUILD-E-TESTE.md). Por `npm start` ela nunca aparece, de propósito |
-| Atualizar falha com `EPERM` / `EACCES`          | O `.exe` está numa pasta onde o usuário não escreve (`Arquivos de Programas`). A troca renomeia e grava ao lado — portátil precisa morar onde se escreve |
-| Sobrou um `Tickets.exe.old` ao lado do `.exe`   | Resto da troca: o binário antigo só pode ser apagado depois que aquele processo morreu, então some na abertura seguinte (`limparAntigo`). Apagar na mão é seguro |
-| Atualizou e as configurações sumiram            | Não é a atualização: config e resumos vivem em `%APPDATA%\tickets`, e a troca só mexe no `.exe` |
+| A faixa de "versão nova" nunca aparece          | Esperado: o OTA está dormente desde a troca de `portable` para `nsis`. `exePath()` (`services/update.js:39`) lê `PORTABLE_EXECUTABLE_FILE`, que só o launcher portable exportava; sem ela `checar()` sai em `{ atual: true }` e a faixa nunca é montada. Atualizar hoje é enviar o Setup novo — ver [`docs/BUILD-E-TESTE.md`](docs/BUILD-E-TESTE.md) |
+| O app leva ~10 s para abrir, toda vez           | Sintoma do target `portable`, trocado por `nsis` justamente por isso: o `portable.nsi` apaga e re-extrai os ~380 MB no `%TEMP%` a cada abertura, e apaga de novo ao fechar. São dois `RMDir /r` no mesmo template — não há cache, e `unpackDirName` não muda isso. Não voltar |
+| Instalou por cima e as configurações sumiram    | Não é o instalador: config e resumos vivem em `%APPDATA%\tickets`, e ele só mexe em `%LOCALAPPDATA%\Programs\Tickets` |
 | Resumo some ao reabrir o app                    | `%APPDATA%\tickets\resumos.json` não gravou. Apagar o arquivo é seguro — só perde cache |
+| Ticket novo não notifica / notifica sem som     | A notificação é o toast do Windows (`notificar`, `renderer.js`). A primeira carga nunca notifica, de propósito; depois disso, se não aparece, é o Windows — Notificações → Tickets, ou o Assistente de Foco ligado |
 
 ---
 
