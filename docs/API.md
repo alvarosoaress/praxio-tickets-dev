@@ -99,6 +99,10 @@ grid DevExpress página a página, com 500 ms de espera entre elas, e devolve tu
 - **Não existe campo `id`.** O id numérico do portal só aparece dentro de `link`. O app
   extrai com `/\/TicketPrincipal\/(\d+)/` (`renderer.js:105`) — a mesma regex que a API usa
   internamente. Sem id não dá para abrir o detalhe, e a UI diz isso explicitamente.
+- **`lastUpdate` não é o último trâmite.** A coluna do grid (`scraper.js`, `childNodes[6]`)
+  atrasa — medido em 16/09/2026, ticket `0926-001321` com trâmite às 09:30 do dia e
+  `lastUpdate: "11/09/2026 16:44:42"`. O app descarta esse valor e usa a data do trâmite
+  mais recente de `/tramites/:id` (`ipc/tickets.js`).
 - **Datas em `DD/MM/YYYY HH:mm:ss`.** `new Date()` lê isso como mês/dia. Sempre `parseBR()`.
 - **`team` vem com parênteses**: `"(N4)"`.
 - **`responsible` é o desenvolvedor**; `person` é quem abriu do lado do cliente.

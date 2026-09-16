@@ -167,6 +167,8 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Campo da chave abre com bolinhas                | É máscara gerada na tela, não a chave — ela nunca chega ao renderer. `hasKey()` só diz que existe uma. Clicar no campo limpa para colar outra |
 | "Chave rejeitada pela API" com chave certa      | A API compara só os primeiros 104 chars. Espaço colado junto passa; chave curta não                                                     |
 | "A API não conseguiu buscar os tickets"         | Erro do servidor, não seu. O login da própria API no portal falhou — ver `PORTAL_LOGIN`/`PORTAL_PASSWORD` no `.env` do `portal-scraper` |
+| "Parado há" não bate com o último trâmite       | A coluna do grid do portal atrasa; `ipc/tickets.js` a substitui pela data do trâmite mais recente. Se voltou a divergir, o ticket veio sem `link`/id ou `/tramites` falhou para ele |
+| Atualizar a lista ficou mais lento              | Esperado: além do `/scrape-custom`, sai um `/tramites/:id` por ticket para achar a data real. Serializado, ~1 s por ticket |
 | Lista carrega mas a faixa de anexos não aparece | A faixa sai do `anexos` de cada trâmite (`anexosDe`), não de rota própria. Se os trâmites vieram sem `anexos`, faltou o `?anexos=1` |
 | Anexos não aparecem dentro dos trâmites         | Falta o `?anexos=1` na chamada (`ipc/tickets.js`), ou a API apontada é anterior a essa rota |
 | Trâmite editado no portal não aparece ao reabrir | Cache por `lastUpdate` (`renderer.js`). Se o portal não mexeu no `lastUpdate`, o app serve o que tinha. `F5` no detalhe ignora o cache |
@@ -250,7 +252,7 @@ silêncio.
 | **customSearchMenu** | Busca salva criada à mão na GUI do portal; o id sai da requisição do browser. `27662` = fila do time de desenvolvimento |
 | **trâmite**          | Uma mensagem no histórico do ticket. Tem origem (operador/cliente/privado), autor, data e o status daquele momento      |
 | **visualização**     | Registro de quem abriu o ticket no portal e quando                                                                      |
-| **parado há X**      | Tempo corrido desde `lastUpdate`. É o sinal primário da tela, não o status                                              |
+| **parado há X**      | Tempo corrido desde o **trâmite mais recente**. É o sinal primário da tela, não o status                                |
 | **anexo**            | Arquivo enviado no ticket. Vive no portal, exige sessão, e só a API consegue buscar                                     |
 
 ### Nomes que mentem
@@ -261,6 +263,7 @@ silêncio.
 | `team`                                   | Vem com parênteses do portal: `"(N4)"`, não `"N4"`                                            |
 | `/anexos/:ticketId` vs `/anexo/:anexoId` | Plural lista (JSON), singular devolve **bytes**. Um caractere de diferença                    |
 | `id` no trâmite                          | Só existe quando o trâmite **tem anexo** — o portal só renderiza o clipe nesse caso           |
+| `lastUpdate`                             | A coluna do grid atrasa dias. `ipc/tickets.js` sobrescreve com a data do trâmite mais recente |
 | `DESIGN.md`                              | Não é guia de estilo genérico: é o contrato do mundo visual escolhido, com as proibições dele |
 
 ---
