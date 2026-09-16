@@ -643,3 +643,32 @@ assert.strictEqual(faixa.dataset.kind, 'down');
 showNoticeIn('notice', 'stale', 'so o fato, sem acao', null, null);
 assert.strictEqual(botao.hidden, true, 'faixa sem acao nao deixa o botao anterior na tela');
 delete global.document;
+
+
+// A cor do status pessoal vai para um style inline e o id vira chave da marca: ipc/status.js
+// e a fronteira dos dois. Item malformado some sozinho, como em set-repos — uma linha ruim
+// nao pode derrubar a lista inteira, que salva sozinha.
+const { limpar: limparStatus, DEFAULTS, MAX_DEFS, MAX_NOME } = require('./ipc/status.js');
+
+assert.strictEqual(limparStatus(null), null);
+assert.strictEqual(limparStatus('{}'), null, 'string nao e blob');
+assert.deepStrictEqual(limparStatus({}), { defs: [], por: {} });
+assert.deepStrictEqual(limparStatus({ defs: DEFAULTS, por: {} }).defs, DEFAULTS, 'os padroes passam pela propria fronteira');
+
+const st = limparStatus({
+  defs: [
+    { id: 'olhando', nome: '  Olhando  ', cor: '#5AA9FF' },
+    { id: 'olhando', nome: 'id repetido', cor: '#ffffff' },
+    { id: 'id com espaco', nome: 'id fora da allowlist', cor: '#ffffff' },
+    { id: 'semcor', nome: 'cor por nome', cor: 'red' },
+    { id: 'aspas', nome: 'cor que escapa do style', cor: '#fff" onload="x' },
+    { id: 'vazio', nome: '   ', cor: '#ffffff' }
+  ],
+  por: { 939100: 'olhando', 939101: 'apagado', 939102: 42 }
+});
+assert.deepStrictEqual(st.defs, [{ id: 'olhando', nome: 'Olhando', cor: '#5aa9ff' }], 'so o primeiro item presta');
+assert.deepStrictEqual(st.por, { 939100: 'olhando' }, 'marca para status que nao existe mais nao e gravada');
+
+const muitos = Array.from({ length: 30 }, (_, i) => ({ id: 'id' + i, nome: 'n' + i, cor: '#ffffff' }));
+assert.strictEqual(limparStatus({ defs: muitos }).defs.length, MAX_DEFS);
+assert.strictEqual(limparStatus({ defs: [{ id: 'a', nome: 'x'.repeat(80), cor: '#ffffff' }] }).defs[0].nome.length, MAX_NOME);

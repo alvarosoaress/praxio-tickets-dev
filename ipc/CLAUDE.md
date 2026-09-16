@@ -11,6 +11,7 @@ A fronteira com o renderer. Um arquivo por domínio, cada um exportando `registe
 | `resumo.js`  | `resumo`                                         |
 | `hotfix.js`  | `hotfix-probe`, `hotfix-start`                    |
 | `update.js`  | `update-check`, `update-apply`                   |
+| `status.js`  | `status-get`, `status-set`                        |
 
 `registerProtocol()` é a exceção: precisa rodar **dentro** do `whenReady`. O
 `registerSchemesAsPrivileged` que ele exige fica em `main.js`, no escopo de módulo, porque
@@ -32,6 +33,22 @@ tem que acontecer **antes** do ready. Separar os dois não é estilo, é ordem o
 3. **Erro da API sai verbatim.** `/scrape-custom` devolve `401 "Falha no login"` quando o
    **servidor** falha ao logar no portal. Traduzir status HTTP para mensagem própria faz o
    app culpar o usuário por um problema que não é dele.
+
+## `status.js`
+
+O status pessoal é escrito pelo usuário e volta para a tela como **cor num `style` inline** e
+**id de uma marca**. Nenhum dos dois pode ser string livre: `limpar()` exige `#rrggbb` e um id
+da allowlist `[a-z0-9]{1,16}`, corta o nome em 24 e a lista em 12. Item malformado é
+descartado em silêncio, como em `set-repos` — a lista salva sozinha, e uma linha ruim não pode
+derrubar as boas.
+
+Marca que aponta para um status inexistente **não é gravada**: é assim que apagar um status
+limpa as marcas dele sem uma segunda passada, e é o que impede o arquivo de guardar referência
+solta.
+
+Os quatro status padrão saem daqui, e só enquanto o arquivo **nunca foi gravado** — a checagem
+é "existe a chave `defs`", não "a lista tem item". Apagar todos é escolha do usuário; um
+default que ressuscita sozinho não é default.
 
 ## `hotfix.js`
 

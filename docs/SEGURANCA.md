@@ -6,7 +6,7 @@
 
 ---
 
-## As cinco fronteiras
+## As fronteiras
 
 | Fronteira | O que atravessa | Onde é defendida |
 | --- | --- | --- |
@@ -16,6 +16,7 @@
 | Disco | A chave de 104 caracteres | `config.json` no `userData` |
 | **App → Anthropic** | **Texto do ticket e os `.md` da raiz do repo do módulo, no resumo** | **Gate de consentimento em `ipc/resumo.js`** |
 | **App → linha de comando** | **Número do ticket, no nome de branch e de arquivo** | **Allowlist em `slugTicket()` (`services/git.js`)** |
+| Config → `style` inline | A cor do status pessoal | `#rrggbb` obrigatório em `limpar()` (`ipc/status.js`) |
 
 ---
 
@@ -124,6 +125,19 @@ viraria um proxy autenticado para qualquer caminho do portal — a API tem sess�
 
 Redundante de propósito. O app valida para dar erro cedo; a API valida porque é ela que
 tem o poder.
+
+### A cor do status pessoal
+
+O único valor de configuração que vira **CSS** é a cor do status: ela é escrita num `style`
+inline na linha da lista e no ponto do menu. Um campo livre ali seria injeção de propriedade
+CSS com um `;`, e a CSP não ajuda — `style-src` já precisa de `'unsafe-inline'` para o zoom
+da imagem. Por isso `limpar()` (`ipc/status.js`) exige `#rrggbb` e o id da marca vem de uma
+allowlist `[a-z0-9]{1,16}`: o que não casa é descartado antes de chegar ao disco, e o
+renderer nunca lê do arquivo sem passar por lá.
+
+O arquivo é editável à mão, como todo `%APPDATA%	ickets\*.json` — a validação está no
+**caminho de leitura**, não só no de escrita, exatamente para que editar o arquivo à mão não
+seja um caminho mais curto que a tela.
 
 ---
 

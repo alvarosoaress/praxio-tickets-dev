@@ -2,6 +2,10 @@
 
 const REFRESH_MS = 5 * 60 * 1000;
 const AGE_TICK_MS = 60 * 1000;
+// Espelham os tetos de ipc/status.js: quem reprova e o main, aqui e so para a tela nao
+// oferecer o que vai ser descartado.
+const MAX_STATUS = 12;
+const MAX_NOME_STATUS = 24;
 
 const $ = id => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -68,26 +72,42 @@ const statusKey = s => {
   return 'outro';
 };
 
+/* ---------- status pessoal ---------- */
+
+// { defs: [{ id, nome, cor }], por: { "<numero>": "<id>" } } — vem do main na abertura e
+// e regravado inteiro a cada mudanca. E marca do usuario sobre o ticket, nao dado do
+// portal: o numero do ticket e a chave porque ele existe sempre, e o id nem sempre.
+let meus = { defs: [], por: {} };
+
+const meuDe = t => meus.defs.find(d => d.id === meus.por[t.number]) || null;
+// Id interno e estavel: renomear o status nao pode soltar as marcas que ja existem.
+const novoId = () => crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+const salvarMeus = () => window.api.statusSet(meus);
+
 /* ---------- filtros ---------- */
 
 const filters = () => ({
   q: norm($('q').value.trim()),
   resp: $('fResp').value,
   client: $('fClient').value,
-  status: $('fStatus').value
+  status: $('fStatus').value,
+  meu: $('fMeu').value
 });
 
 const matches = (t, f) =>
   (!f.resp || t.responsible === f.resp) &&
   (!f.client || t.client === f.client) &&
   (!f.status || t.status === f.status) &&
+  (!f.meu || meus.por[t.number] === f.meu) &&
   (!f.q || norm([t.number, t.title, t.client, t.module, t.person, t.responsible, t.status].join(' ')).includes(f.q));
 
-function fillSelect(sel, values, allLabel) {
+// labelOf existe so para o filtro do status pessoal: ali o valor e o id, que e interno, e
+// o rotulo e o nome que o usuario deu. Nos outros tres valor e rotulo sao a mesma string.
+function fillSelect(sel, values, allLabel, labelOf = v => v) {
   const keep = sel.value;
   sel.textContent = '';
   sel.appendChild(new Option(allLabel, ''));
-  for (const v of values) sel.appendChild(new Option(v, v));
+  for (const v of values) sel.appendChild(new Option(labelOf(v), v));
   sel.value = values.includes(keep) ? keep : '';
   sel.dataset.active = sel.value ? '1' : '0';
 }
@@ -100,6 +120,11 @@ function syncSelects() {
   fillSelect($('fResp'), uniq('responsible'), 'Todos responsáveis');
   fillSelect($('fClient'), uniq('client'), 'Todos clientes');
   fillSelect($('fStatus'), uniq('status'), 'Todos status');
+  // So os status que estao marcados em algum ticket da fila — mesma regra dos outros
+  // tres, que saem dos tickets e nao de uma lista fixa. Filtrar por marca que ninguem tem
+  // so devolve "nenhum resultado".
+  const emUso = meus.defs.filter(d => (tickets || []).some(t => meus.por[t.number] === d.id)).map(d => d.id);
+  fillSelect($('fMeu'), emUso, 'Todos os meus status', id => (meus.defs.find(d => d.id === id) || {}).nome || id);
 }
 
 /* ---------- render ---------- */
@@ -115,6 +140,7 @@ function ticketRow(t) {
   row.dataset.age = ageBucket(min);
   row.addEventListener('click', e => { if (!e.target.closest('a')) openDetail(t); });
   row.addEventListener('keydown', e => { if (e.key === 'Enter') openDetail(t); });
+  row.addEventListener('contextmenu', e => { e.preventDefault(); abrirCtx(e, t); });
 
   const head = el('div', 'row-head');
   const a = el('a', 'tnum');
@@ -130,8 +156,20 @@ function ticketRow(t) {
   if (t.responsible) meta.append(el('span', 'dot', '/'), el('span', 'who', t.responsible));
   if (t.person) meta.append(el('span', 'dot', '/'), el('span', 'per', t.person));
 
-  const st = el('div', 'status', t.status || 'sem status');
-  st.dataset.s = statusKey(t.status);
+  // A marca do usuario vem antes e leva a cor; o status do portal continua na linha, em
+  // --text-faint. Um item colorido por linha — dois pontos coloridos lado a lado seriam
+  // duas coisas disputando a mesma leitura periferica.
+  const st = el('div', 'status');
+  const meu = meuDe(t);
+  if (meu) {
+    const m = el('span', 'mine', meu.nome);
+    m.style.color = meu.cor;
+    st.dataset.mine = '1';
+    st.append(m, el('span', 'dot', '/'));
+  }
+  const portal = el('span', 'portal', t.status || 'sem status');
+  portal.dataset.s = statusKey(t.status);
+  st.appendChild(portal);
 
   const age = el('div', 'age');
   age.append(el('span', 'n', ageLabel(min)), el('span', 'l', 'parado'));
@@ -237,10 +275,68 @@ function render() {
 
 function clearFilters() {
   $('q').value = '';
-  for (const id of ['fResp', 'fClient', 'fStatus']) {
+  for (const id of ['fResp', 'fClient', 'fStatus', 'fMeu']) {
     $(id).value = '';
     $(id).dataset.active = '0';
   }
+  render();
+}
+
+/* ---------- menu do botao direito ---------- */
+
+// Popover nativo: top layer (o #scroll rola e cortaria um filho posicionado), Esc e
+// clique fora ja resolvidos pelo light-dismiss. Um <dialog> abriria no centro da tela,
+// longe da linha que o usuario acabou de apontar.
+function abrirCtx(e, t) {
+  if (!t.number) return;                   // sem numero nao ha chave para guardar a marca
+  const ctx = $('ctx');
+  if (ctx.matches(':popover-open')) ctx.hidePopover();
+  ctx.textContent = '';
+  ctx.appendChild(el('div', 'ctx-head', t.number));
+
+  const atual = meus.por[t.number] || '';
+  for (const d of meus.defs) ctx.appendChild(ctxItem(d, d.id === atual, () => marcar(t, d.id)));
+  if (atual) ctx.appendChild(ctxItem(null, false, () => marcar(t, '')));
+  if (!meus.defs.length) ctx.appendChild(el('p', 'ctx-none', 'Nenhum status definido ainda.'));
+
+  const cfg = el('button', 'ctx-item ctx-cfg', 'Editar status…');
+  cfg.type = 'button';
+  cfg.addEventListener('click', () => { ctx.hidePopover(); openConfig(); });
+  ctx.appendChild(cfg);
+
+  // Mede depois de aberto: fechado o popover nao tem tamanho, e sem o tamanho nao da para
+  // saber se ele caberia abaixo do cursor.
+  ctx.style.left = '0px';
+  ctx.style.top = '0px';
+  ctx.showPopover();
+  const r = ctx.getBoundingClientRect();
+  ctx.style.left = Math.max(8, Math.min(e.clientX, innerWidth - r.width - 8)) + 'px';
+  ctx.style.top = Math.max(8, Math.min(e.clientY, innerHeight - r.height - 8)) + 'px';
+  // A tecla de menu do Windows dispara este mesmo evento na linha em foco, sem cursor:
+  // sem levar o foco para dentro, o menu abriria inalcancavel pelo teclado.
+  ctx.querySelector('.ctx-item').focus();
+}
+
+// def null e o item de limpar — mesma linha, sem cor, para nao virar um segundo idioma.
+function ctxItem(d, marcado, onPick) {
+  const b = el('button', d ? 'ctx-item' : 'ctx-item ctx-limpar');
+  b.type = 'button';
+  b.setAttribute('role', 'menuitemradio');
+  b.setAttribute('aria-checked', marcado ? 'true' : 'false');
+  const dot = el('span', 'ctx-dot');
+  if (d) dot.style.background = d.cor;
+  b.append(dot, el('span', 'ctx-nome', d ? d.nome : 'Sem status'));
+  if (marcado) { b.dataset.on = '1'; b.appendChild(icon('i-check', 'ctx-check')); }
+  b.addEventListener('click', onPick);
+  return b;
+}
+
+function marcar(t, id) {
+  $('ctx').hidePopover();
+  if (id) meus.por[t.number] = id;
+  else delete meus.por[t.number];
+  salvarMeus();
+  syncSelects();
   render();
 }
 
@@ -1023,6 +1119,7 @@ async function openConfig() {
 
   cfgRepos = res.repos || [];
   renderRepos();
+  renderStatus();
 }
 
 // Os modulos saem da fila ja carregada — nao existe rota que os liste. Na primeira
@@ -1131,6 +1228,53 @@ function addMod(input, refocus) {
   if (!refocus) return;
   const again = $('cfgRepos').querySelector('.repo[data-i="' + i + '"] .mod-input');
   if (again) again.focus();
+}
+
+// Diferente dos repositorios, aqui o espelho da tela E o estado do app: a lista pinta a
+// lista de tickets atras do dialog, entao editar e mexer em `meus` e repintar as duas.
+function renderStatus() {
+  const box = $('cfgStatus');
+  box.textContent = '';
+  if (!meus.defs.length) {
+    box.appendChild(el('p', 'repo-none', 'Nenhum status definido.'));
+    return;
+  }
+  meus.defs.forEach((d, i) => box.appendChild(statusRow(d, i)));
+}
+
+function statusRow(d, i) {
+  const row = el('div', 'st');
+  row.dataset.i = i;
+
+  const cor = el('input', 'st-cor');
+  cor.type = 'color';
+  cor.value = d.cor;
+  cor.setAttribute('aria-label', 'Cor de ' + d.nome);
+
+  const nome = el('input', 'st-nome');
+  nome.type = 'text';
+  nome.value = d.nome;
+  nome.maxLength = 24;
+  nome.spellcheck = false;
+  nome.setAttribute('aria-label', 'Nome do status');
+
+  const del = el('button', 'btn btn-ghost btn-icon');
+  del.type = 'button';                  // dentro de <form method="dialog"> o default fecharia o dialog
+  del.dataset.act = 'delst';
+  del.title = 'Remover ' + d.nome;
+  del.setAttribute('aria-label', 'Remover ' + d.nome);
+  del.appendChild(icon('i-close'));
+
+  row.append(cor, nome, del);
+  return row;
+}
+
+// Autosave, como os repositorios: o rodape governa so a chave.
+function saveStatus(repintar) {
+  salvarMeus();
+  if (!repintar) return;
+  syncSelects();
+  render();
 }
 
 async function saveConfig() {
@@ -1251,6 +1395,47 @@ $('cfgRepos').addEventListener('click', async e => {
   }
 });
 
+$('cfgAddStatus').addEventListener('click', () => {
+  if (meus.defs.length >= MAX_STATUS) return;
+  meus.defs.push({ id: novoId(), nome: 'Novo status', cor: '#5aa9ff' });
+  renderStatus();
+  const campos = $('cfgStatus').querySelectorAll('.st-nome');
+  const ultimo = campos[campos.length - 1];
+  ultimo.focus();
+  ultimo.select();                       // o nome nasce provisorio: digitar por cima e o caminho comum
+  saveStatus(false);                     // nada muda na lista ainda: status novo nao esta marcado em ninguem
+});
+
+// Delegado: as linhas sao remontadas a cada mudanca.
+$('cfgStatus').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act="delst"]');
+  if (!b) return;
+  const i = +b.closest('.st').dataset.i;
+  const id = meus.defs[i].id;
+  meus.defs.splice(i, 1);
+  // Apagar o status apaga as marcas dele — o main descartaria essas linhas na gravacao de
+  // qualquer jeito, e a tela nao pode ficar mostrando uma marca que ja nao existe.
+  for (const n of Object.keys(meus.por)) if (meus.por[n] === id) delete meus.por[n];
+  renderStatus();
+  saveStatus(true);
+});
+
+$('cfgStatus').addEventListener('change', e => {
+  const row = e.target.closest('.st');
+  if (!row) return;
+  const d = meus.defs[+row.dataset.i];
+  if (e.target.classList.contains('st-cor')) d.cor = e.target.value;
+  else if (e.target.classList.contains('st-nome')) d.nome = e.target.value.trim().slice(0, MAX_NOME_STATUS) || d.nome;
+  renderStatus();
+  saveStatus(true);
+});
+
+$('cfgStatus').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || !e.target.classList.contains('st-nome')) return;
+  e.preventDefault();                    // Enter aqui submeteria o <form method="dialog">
+  e.target.blur();                       // o blur dispara o change, que grava
+});
+
 $('cfgRepos').addEventListener('keydown', e => {
   if (!e.target.classList.contains('mod-input')) return;
   if (e.key !== 'Enter' && e.key !== ',') return;
@@ -1267,7 +1452,8 @@ $('cfgRepos').addEventListener('change', e => {
 const inDetail = () => !$('detailView').hidden;
 
 document.addEventListener('keydown', e => {
-  if ($('cfg').open || $('viewer').open || $('resumo').open || $('claudeAsk').open) return;   // dialogs cuidam do proprio Esc
+  // Dialogs e o menu cuidam do proprio Esc — o popover fecha sozinho no light-dismiss.
+  if ($('cfg').open || $('viewer').open || $('resumo').open || $('claudeAsk').open || $('ctx').matches(':popover-open')) return;
   if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r')) {
     e.preventDefault();
     inDetail() ? (current && openDetail(current, true)) : load();
@@ -1296,6 +1482,10 @@ timer = setInterval(load, REFRESH_MS);
 
 load();
 checkUpdate();
+window.api.statusGet().then(b => {
+  meus = b;
+  if (tickets) { syncSelects(); render(); }
+});
 }
 
 if (typeof document !== 'undefined') wire();

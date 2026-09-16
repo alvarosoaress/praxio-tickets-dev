@@ -55,8 +55,8 @@ arquivo único, a doc dela mora em `docs/`.
 | Arquivo       | Papel                                                                                                          |
 | ------------- | -------------------------------------------------------------------------------------------------------------- |
 | `main.js`     | Só o arquivo principal: registra o scheme, liga os módulos de IPC, abre a janela. ~40 linhas                   |
-| `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`, `git`, `update`           |
-| `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`, `hotfix`, `update`                       |
+| `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`, `git`, `update`, `status`, `status`  |
+| `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`, `hotfix`, `update`, `status`, `status`             |
 | `preload.js`  | Ponte `contextBridge`. 15 funções, nada além disso                                                             |
 | `renderer.js` | Toda a UI: lista, detalhe, filtros, visualizador de anexo, estados de erro                                     |
 | `modulos.js`  | `normModules()`: código de módulo do portal. Puro, como o `sanitize.js`                                        |
@@ -203,7 +203,17 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | O app leva ~10 s para abrir, toda vez           | Sintoma do target `portable`, trocado por `nsis` justamente por isso: o `portable.nsi` apaga e re-extrai os ~380 MB no `%TEMP%` a cada abertura, e apaga de novo ao fechar. São dois `RMDir /r` no mesmo template — não há cache, e `unpackDirName` não muda isso. Não voltar |
 | Instalou por cima e as configurações sumiram    | Não é o instalador: config e resumos vivem em `%APPDATA%\tickets`, e ele só mexe em `%LOCALAPPDATA%\Programs\Tickets` |
 | Resumo some ao reabrir o app                    | `%APPDATA%\tickets\resumos.json` não gravou. Apagar o arquivo é seguro — só perde cache |
+| Botão direito na linha não abre menu             | A linha precisa ser uma `.row` da lista — no detalhe não há menu. Se nem na lista abre, o ticket veio sem `number`, que é a chave da marca (`abrirCtx`, `renderer.js`) |
+| Meus status sumiram ao reabrir o app            | `%APPDATA%	ickets\status.json` não gravou. Eles salvam sozinhos a cada mudança, não no botão Salvar — que governa só a chave |
+| Marquei um ticket e a marca não apareceu        | Cor ou nome reprovados na fronteira: `ipc/status.js` só aceita `#rrggbb` e nome não-vazio, e descarta o resto em silêncio |
+| O status que apaguei levou as marcas junto      | Esperado: marca para status inexistente não é gravada (`limpar`, `ipc/status.js`). Renomear, ao contrário, não solta nada — a marca guarda o id, não o nome |
+| Um status não aparece no filtro "meus status"   | Só entram os que estão marcados em algum ticket da fila — mesma regra dos outros três selects |
 | Ticket novo não notifica / notifica sem som     | A notificação é o toast do Windows (`notificar`, `renderer.js`). A primeira carga nunca notifica, de propósito; depois disso, se não aparece, é o Windows — Notificações → Tickets, ou o Assistente de Foco ligado |
+| Botão direito na linha não abre menu             | Só a lista tem menu, o detalhe não. Se nem na lista abre, o ticket veio sem `number` — é ele a chave da marca (`abrirCtx`, `renderer.js`) |
+| Meus status somem ao reabrir o app              | `%APPDATA%	ickets\status.json` não gravou. Eles salvam sozinhos a cada mudança, não no botão Salvar — que governa só a chave |
+| Marquei um ticket e a marca não apareceu        | Nome ou cor reprovados na fronteira: `ipc/status.js` só aceita `#rrggbb` e nome não-vazio, e descarta o resto em silêncio |
+| O status que apaguei levou as marcas junto      | Esperado: marca para status inexistente não é gravada (`limpar`, `ipc/status.js`). Renomear não solta nada — a marca guarda o id, não o nome |
+| Um status não aparece no filtro de meus status  | Só entram os que estão marcados em algum ticket da fila — mesma regra dos outros três selects |
 
 ---
 

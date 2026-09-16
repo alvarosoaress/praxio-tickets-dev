@@ -9,6 +9,7 @@ const ipcAnexos = require('./ipc/anexos');
 const ipcResumo = require('./ipc/resumo');
 const ipcHotfix = require('./ipc/hotfix');
 const ipcUpdate = require('./ipc/update');
+const ipcStatus = require('./ipc/status');
 const { attachDevLog } = require('./services/devlog');
 
 // anexo://<id> serve os bytes do anexo vindos da API. Assim <img>, <video> e o
@@ -25,6 +26,7 @@ ipcAnexos.register();
 ipcResumo.register();
 ipcHotfix.register();
 ipcUpdate.register();
+ipcStatus.register();
 
 // Sem AppUserModelID o Windows nao sabe de quem e o toast e some com ele sem tocar som.
 app.setAppUserModelId('com.alvaro.tickets');

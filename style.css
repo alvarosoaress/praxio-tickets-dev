@@ -345,13 +345,21 @@ select option { background: var(--surface-2); color: var(--text); }
   grid-column: 1;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  min-width: 0;
   font-size: 12px;
   color: var(--text-faint);
   justify-self: start;
 }
 
-.status::before {
+.status .mine, .status .portal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.status .mine { font-weight: 500; }
+.status .dot { color: var(--line-2); }
+
+/* O ponto marca quem manda na linha: a marca do usuario quando ela existe, o status do
+   portal quando nao. Dois pontos coloridos seriam duas coisas disputando a mesma leitura. */
+.status .mine::before,
+.status:not([data-mine]) .portal::before {
   content: "";
   width: 5px;
   height: 5px;
@@ -360,10 +368,14 @@ select option { background: var(--surface-2); color: var(--text); }
   flex: none;
 }
 
-.status[data-s="andamento"] { color: var(--info); }
-.status[data-s="cliente"] { color: #b28cff; }
-.status[data-s="aberto"] { color: var(--text-dim); }
-.status[data-s="concluido"] { color: var(--ok); }
+.status .portal[data-s="andamento"] { color: var(--info); }
+.status .portal[data-s="cliente"] { color: #b28cff; }
+.status .portal[data-s="aberto"] { color: var(--text-dim); }
+.status .portal[data-s="concluido"] { color: var(--ok); }
+
+/* Com marca do usuario o status do portal apaga: ele continua legivel, deixa de competir.
+   Vem depois das cores de proposito — mesma especificidade, quem fala por ultimo vence. */
+.status[data-mine] .portal { color: var(--text-faint); }
 
 .age {
   grid-column: 2;
@@ -831,7 +843,6 @@ select option { background: var(--surface-2); color: var(--text); }
 /* ---------- esqueleto de carregamento ---------- */
 
 .skel { pointer-events: none; }
-.skel .status::before { display: none; }
 
 .sk {
   display: block;
@@ -992,6 +1003,47 @@ select option { background: var(--surface-2); color: var(--text); }
 
 .repo-none { margin: 0 0 11px; font-size: 12.5px; color: var(--text-faint); }
 
+/* Status e linha, como o repositorio e como o tramite. Separada por 1px, sem caixa. */
+.st { display: flex; align-items: center; gap: 7px; padding: 8px 0; border-top: 1px solid var(--line); }
+.st:first-child { padding-top: 0; border-top: 0; }
+.st:last-child { padding-bottom: 11px; }   /* mesmo respiro que a lista de repositorios da ao botao de adicionar */
+
+/* O seletor de cor do Chromium vem com moldura e padding proprios; zerados, ele fica do
+   tamanho de um controle desta tela e a cor ocupa o quadrado inteiro. */
+.st-cor {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+  flex: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.st-cor::-webkit-color-swatch-wrapper { padding: 3px; }
+.st-cor::-webkit-color-swatch { border: none; border-radius: 3px; }
+
+.st-nome {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 12.5px/1 var(--sans);
+  outline: none;
+  user-select: text;
+  text-overflow: ellipsis;
+  transition: border-color .15s var(--ease);
+}
+
+.st-nome:focus { border-color: #4a5563; }
+
 #cfgAddRepo { margin-top: 12px; }
 
 
@@ -1046,6 +1098,66 @@ select option { background: var(--surface-2); color: var(--text); }
 .rs-skel { display: flex; flex-direction: column; gap: 7px; }
 .rs-skel span { height: 9px; border-radius: 2px; background: var(--surface-2); }
 .rs-skel span:last-child { width: 58%; }
+
+/* Menu do botao direito. Popover no top layer: nao e clipado pelo #scroll e nao precisa
+   de z-index. `inset: auto` desliga a centralizacao que o popover traz de fabrica — quem
+   posiciona e o JS, no cursor. */
+.ctx {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 4px;
+  min-width: 186px;
+  max-width: 260px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .55);
+  color: var(--text);
+}
+
+.ctx-head {
+  padding: 7px 9px 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  font: 500 11px/1 var(--mono);
+  letter-spacing: .04em;
+  color: var(--text-faint);
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-dim);
+  font: 400 13px/1.2 var(--sans);
+  text-align: left;
+  cursor: pointer;
+  transition: background .12s var(--ease), color .12s var(--ease);
+}
+
+.ctx-item:hover { background: var(--surface-2); color: var(--text); }
+.ctx-item[data-on="1"] { color: var(--text); }
+
+.ctx-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-2); flex: none; }
+/* Tracejado = lugar vazio, o mesmo sentido que ele ja tem no .tr-img e no campo de modulo. */
+.ctx-limpar .ctx-dot { background: none; border: 1px dashed var(--line-2); }
+.ctx-nome { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctx-check { width: 13px; height: 13px; flex: none; color: var(--text-faint); }
+.ctx-none { margin: 4px 9px 8px; font-size: 12.5px; color: var(--text-faint); }
+
+.ctx-cfg {
+  margin-top: 4px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 5px 5px;
+  color: var(--text-faint);
+}
 
 dialog {
   width: min(470px, calc(100vw - 48px));

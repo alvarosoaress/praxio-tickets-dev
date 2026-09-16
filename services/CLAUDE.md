@@ -15,6 +15,7 @@ de IPC. Quem faz a ponte é [`../ipc/`](../ipc/CLAUDE.md).
 > planilha em CSV custa uma fração do mesmo dado em `<table>`.
 | `claude.js`    | o binário `claude` do PATH  | conhece `config.js` — ver abaixo                         |
 | `resumos.js`   | `resumos.json` no `userData` | mistura com `config.json` — ver abaixo                   |
+| `status.js`    | `status.json` no `userData` | mistura com `config.json`, pelo mesmo motivo do `resumos.js` |
 | `devlog.js`    | `dev.log` + console         | roda fora de `TICKETS_API`                               |
 | `git.js`       | o binário `git` do PATH     | importa `electron` — ver abaixo                          |
 | `update.js`    | `api.github.com` + o `.exe` portátil | escreve por cima do `.exe` que está rodando, ou baixa de fora do repo |
@@ -59,12 +60,15 @@ exige a branch de **produção** igual à origin, não só a develop — por iss
 trocar de branch e sem forçar. Falhar ali não interrompe: quem decide se pode começar
 continua sendo o gitflow, que dá a mensagem certa.
 
-## Por que `resumos.js` não usa o `config.json`
+## Por que `resumos.js` e `status.js` não usam o `config.json`
 
 O cache de resumo cresce, é descartável e pode ser apagado a qualquer momento sem
 consequência. A chave da API não é nada disso. Somados no mesmo arquivo, cada resumo
 reescreveria o arquivo da chave — e `readCfg` trata arquivo corrompido como "ainda não
 configurado", o que ali custa a chave do usuário e aqui não custa nada.
+
+O `status.json` está do mesmo lado por uma razão parecida: marcar um ticket acontece dezenas
+de vezes por dia. Perder esse arquivo custa as marcações; perder o outro custa a chave.
 
 ## Armadilhas do `claude.js`
 

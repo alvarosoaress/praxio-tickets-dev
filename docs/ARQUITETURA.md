@@ -37,7 +37,7 @@ ligado.
 
 ## Contrato do IPC
 
-Treze canais, todos definidos em `preload.js` e implementados em [`ipc/`](../ipc/CLAUDE.md).
+Dezenove canais, todos definidos em `preload.js` e implementados em [`ipc/`](../ipc/CLAUDE.md).
 
 | Canal | Entrada | Saída | Onde |
 | --- | --- | --- | --- |
@@ -54,6 +54,12 @@ Treze canais, todos definidos em `preload.js` e implementados em [`ipc/`](../ipc
 | `anexo-text` | `anexoId` | `{ text }` ou `{ error }` | `ipc/anexos.js` |
 | `anexo-html` | `{ id, kind }` | `{ sheets }` ou `{ error }` | `ipc/anexos.js` |
 | `resumo` | `{ id, ticket, tramites, refazer }` | `{ text, cached? }` ou `{ error }` | `ipc/resumo.js` |
+| `hotfix-probe` | `{ id, ticket }` | `{ ok, … }` ou `{ error }` | `ipc/hotfix.js` |
+| `hotfix-start` | `{ id, ticket }` | `{ ok, branch, stash? }` ou `{ error }` | `ipc/hotfix.js` |
+| `update-check` | — | `{ atual }` ou `{ versao, url }` | `ipc/update.js` |
+| `update-apply` | `url` | `{ ok }` ou `{ error }` | `ipc/update.js` |
+| `status-get` | — | `{ defs, por }` | `ipc/status.js` |
+| `status-set` | `{ defs, por }` | `{ ok, defs, por }` ou `{ error }` | `ipc/status.js` |
 
 ### Como o processo main é dividido
 
@@ -64,7 +70,7 @@ módulo de IPC e abre a janela. Abaixo dele, duas camadas com direção de depen
 ```
 main.js
   ├─ ipc/        fronteira com o renderer: valida entrada, monta { dados } | { error }
-  └─ services/   adaptadores do mundo externo: config, portalapi, anexo, claude, devlog
+  └─ services/   adaptadores do mundo externo: config, portalapi, anexo, claude, devlog, git, update, status
 ```
 
 Duas ordens são obrigatórias e não são estilo: `registerSchemesAsPrivileged` fica em

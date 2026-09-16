@@ -60,6 +60,62 @@ gradiente em texto, card dentro de card, spinner no meio do conteúdo.
 durante o fetch — é o único movimento autoral, e existe porque a chamada leva ~3,5s.
 `prefers-reduced-motion` desliga.
 
+## O status que é meu
+
+O portal já diz "Em andamento" ou "Aguardando cliente". Isso é o que **o ticket** está — e a
+fila inteira costuma responder a mesma coisa. O que não existe em lugar nenhum é o que **eu**
+estou: olhando agora, esperando uma resposta, bloqueado, resolvido do meu lado enquanto o
+portal não fecha. Essa marca é do desenvolvedor, vive só nesta máquina e é o que o botão
+direito na linha aplica.
+
+**Botão direito, não um controle na linha.** Um seletor visível por linha seria um alvo
+permanente numa tela onde a maioria das linhas nunca vai ser marcada, e a linha tem um alvo
+só de propósito: ela inteira abre o detalhe. O menu é o `popover` nativo — top layer (o
+`.scroll` cortaria qualquer filho posicionado), `Esc` e clique fora resolvidos pelo
+light-dismiss, sem uma linha de JS para isso. Abre no cursor e se desloca para dentro da
+janela quando não caberia. A tecla de menu do Windows dispara o mesmo evento na linha em
+foco, então o caminho existe pelo teclado — por isso o foco vai para o primeiro item.
+
+**A marca vem primeiro e o status do portal apaga.** Os dois continuam na mesma linha,
+separados pela barra que a `.meta` já usa, mas só um leva o ponto colorido: dois pontos lado
+a lado seriam duas coisas disputando a mesma leitura periférica, numa tela que é lida de
+relance do outro monitor. Sem marca, a linha é exatamente a de sempre. Substituir o status do
+portal foi descartado: ele alimenta um filtro e o detalhe, e sumir com ele da lista faria a
+marca custar informação.
+
+**"Sem status" só aparece quando há o que limpar**, e leva o ponto tracejado — o mesmo
+sentido de "lugar vazio" que o tracejado já tem no `.tr-img` e no campo de módulo. O último
+item do menu leva às Configurações: sem ele, quem apagasse todos os status ficaria com um
+menu vazio e nenhuma pista de onde criar o próximo.
+
+**A cor é escolha livre, e essa é a primeira exceção à disciplina de cor deste mundo.** A
+regra de ouro #7 reserva o âmbar ao envelhecimento e o resto da paleta a status e erro; um
+`<input type="color">` deixa marcar "Pendente" de âmbar e furar isso. A alternativa avaliada
+era uma paleta fechada de cinco swatches tirados dos tokens, e o usuário escolheu o seletor
+livre — quem convive com a tela o dia inteiro é quem paga pela escolha ruim, e ele pode
+desfazê-la em dois cliques. O que a liberdade **não** alcança é a forma: ponto de 5px, mesmo
+tipo, mesmo lugar, tamanho igual ao do status do portal. A cor varia; o vocabulário, não.
+
+**Quatro já vêm prontos** — Olhando (azul), Pendente (violeta), Bloqueado (vermelho),
+Resolvido (verde) — porque uma lista vazia na primeira execução obrigaria a inventar um
+vocabulário antes de poder marcar o primeiro ticket. Apagar todos é uma escolha respeitada:
+os padrões só voltam enquanto o arquivo nunca foi gravado, e um default que ressuscita
+sozinho não é default, é teimosia. O teto é 12: uma paleta de doze marcas já não se lê de
+relance, que é a única coisa que essa marca precisa fazer.
+
+**Um quarto select na barra**, e não uma busca. Filtrar por "o que eu estou" é um movimento de
+um clique — "me mostra só o que está bloqueado" — e digitar o nome da marca seria um caminho
+mais longo para a mesma coisa. Ele obedece a mesma regra dos outros três: só entram os status
+que estão marcados em algum ticket da fila, porque filtrar por uma marca que ninguém tem só
+devolve "nenhum resultado".
+
+**No dialog, status é linha, não card** — o mesmo registro do repositório: o seletor de cor à
+esquerda, o nome no meio, remover à direita, separadas por 1px. Salvam sozinhas a cada
+mudança, como os repositórios, e pelo mesmo motivo: ninguém espera apertar Salvar numa lista.
+Apagar um status apaga as marcas dele na hora — deixar a linha da lista apontando para uma
+marca que já não existe seria mostrar um dado fantasma, e renomear não solta nada, porque o
+que a marca guarda é um id interno, não o nome.
+
 ## Tela de detalhe do ticket
 
 Substitui a lista na janela inteira (sem split e sem drawer: a 1280px qualquer divisão
@@ -141,7 +197,8 @@ Figuras de .docx sobrevivem porque o sanitizador aceita `<img>` com `data:image/
 
 ## Configurações
 
-Um dialog só, com duas seções: **a chave da API** e **os repositórios locais**. O botão da
+Um dialog só, com três seções: **a chave da API**, **os repositórios locais** e **os meus
+status**. O botão da
 barra deixou de ser uma chave e virou faders — ele abre Configurações, das quais a chave é
 uma seção; manter o ícone antigo faria o botão mentir sobre o próprio conteúdo. Engrenagem
 foi descartada por medida, não por gosto: os ícones da barra renderizam a 14px, e os dentes
@@ -149,15 +206,15 @@ de uma engrenagem viram mancha nesse tamanho. Traço reto casa com o `#i-thread`
 `#i-resumo` da mesma folha. O `#i-key` **fica** — os estados de "sem chave" e "chave
 rejeitada" continuam sendo sobre a chave especificamente.
 
-**Dois dialogs seriam dois botões na barra** para uma tela que tem quatro controles no
-total. As duas seções se separam por filete de 1px e pelo rótulo mono/caixa-alta — o mesmo
+**Dois dialogs seriam dois botões na barra** — e três, quando a seção seguinte chegasse. As
+seções se separam por filete de 1px e pelo rótulo mono/caixa-alta — o mesmo
 registro do `.rs-k` do resumo e da faixa de metadados. Caixa em volta seria card dentro de
 card, proibido neste mundo.
 
 **A largura continua 470px.** Um caminho como `C:\dev\praxio\Autumn.SIGAi` ocupa ~190px em
 mono 12px; alargar o dialog para caber um caso que já cabe deixaria calha morta, que é
 exatamente o defeito que a regra da medida existe para evitar. A altura é que deixou de ser
-previsível — N repositórios — então o dialog virou coluna com corpo rolável, herdando o
+previsível — N repositórios, N status — então o dialog virou coluna com corpo rolável, herdando o
 padrão do `#resumo`, teto em 640px.
 
 **Repositório é linha, não card:** separada por 1px, como os trâmites e as linhas da lista.
