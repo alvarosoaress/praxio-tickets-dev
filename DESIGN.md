@@ -263,31 +263,12 @@ previsível — N repositórios, N status — então o dialog virou coluna com c
 padrão do `#resumo`, teto em 640px.
 
 **Repositório é linha, não card:** separada por 1px, como os trâmites e as linhas da lista.
-Caminho em mono (é dado medido, não prosa), "Procurar…" e remover à direita. Os módulos
-abaixo, em chips no registro do `.meta .mod` — mono 11px, `letter-spacing .04em`. Eles
-**não** reusam o `.chip` dos anexos: lá a borda tracejada já significa "sem
-pré-visualização" e o hover pinta o ícone de azul, semântica que não é desta tela.
-
-**O campo de módulo é um `<input list>` com `<datalist>`.** Um controle nativo entrega
-autocomplete e digitação livre ao mesmo tempo — `<select multiple>` não aceita valor novo, e
-um combobox próprio seriam centenas de linhas para o mesmo resultado. As opções saem dos
-módulos da fila já carregada: não existe rota que os liste, e na primeira execução o
-datalist fica vazio sem impedir a digitação. Como o datalist completa o valor **inteiro** do
-campo, entra um módulo por vez — é imposição do controle, não escolha. O tracejado do campo
-vazio é o mesmo sentido que ele já tem no `.tr-img`: lugar a preencher.
-
-**Um módulo mora num repositório só**, e a lista obedece isso: o que já foi apontado **sai
-das opções**. Oferecer de novo um módulo já atribuído seria oferecer um movimento com cara de
-adição — e deixaria dois repositórios respondendo pelo mesmo módulo, sem nada na tela dizendo
-qual vale. Digitar à mão um módulo que está em outro repositório **move**, não duplica: ele
-sai de onde estava. Como o dialog mostra todos os repositórios de uma vez, a saída acontece à
-vista, e não é preciso avisar sobre algo que o usuário está vendo. Remover devolve o módulo
-às opções. A invariante é garantida de novo na gravação (`unicos()`, em `modulos.js`), porque
-o `config.json` não pode guardar uma contradição nem quando a tela erra.
-
-> O popup do `<datalist>` é chrome do browser e CSS não o alcança. Sem `color-scheme: dark`
-> ele abre **branco** sobre um app quase preto. O escopo fica no input, não no `:root`: lá
-> mexeria em scrollbar nativa, `<select>`, caret e autofill de uma vez.
+Caminho em mono (é dado medido, não prosa), "Procurar…" e remover à direita. **A linha é só
+o caminho** — nada de etiquetar cada repositório com os módulos do portal que ele atende.
+Esse mapa existiu, e o que ele fazia era o app escolher o repositório sozinho e errar em
+silêncio quando a etiqueta estava errada ou faltando. Perguntar na hora custa um clique e
+não tem como errar calado: a lista dos repositórios apontados está à vista no momento da
+decisão.
 
 **Chave já gravada aparece como 104 bolinhas**, em `--text-faint`, com o contador trocado
 por "chave configurada". Campo vazio numa tela de configuração diz "não há nada aqui", que é
@@ -461,9 +442,10 @@ volta a ter um significado só. O "Salvar e carregar" da chave da API herdou o c
 
 ## Hotfix a partir do resumo
 
-Um segundo botão na barra do `#resumo` leva de "entendi o ticket" a "estou na branch com o
-diagnóstico rodando": cria `hotfix/<número>` no repositório local do módulo, escreve um
-briefing com o resumo dentro dela e abre um terminal com o `claude` investigando.
+Um segundo botão na barra do `#resumo` leva de "entendi o ticket" a "estou na branch, com a
+pergunta pronta": pergunta em qual repositório, cria `hotfix/<número>` nele, escreve um
+briefing com o resumo dentro da branch e abre um terminal com o `claude` — **com a frase já
+digitada na caixa e não enviada**.
 
 **Mora na barra do resumo, não na do detalhe.** A ação só existe quando existe resumo — é
 ele que vira o briefing. Na barra do resumo isso é estrutural: o botão está onde a
@@ -480,16 +462,36 @@ três nós, e os ícones da barra renderizam a 14px — é a mesma medida que de
 engrenagem em Configurações. Duas bolas e um arco sobrevivem ao tamanho; o terceiro nó vira
 mancha. Traço 1.6, a folha inteira.
 
+**O último passo é do usuário, não do app.** O terminal abre com a pergunta escrita e o
+cursor esperando: dá para acrescentar contexto, corrigir o rumo ou desistir antes que
+qualquer coisa saia daqui. O app enviava essa frase sozinho, e o que isso tirava não era um
+clique — era a única chance de corrigir a pergunta antes de ela custar uma resposta inteira.
+
 **Sucesso não tem faixa.** O terminal abrindo é a confirmação — é uma janela nova na tela,
 não há o que anunciar depois disso. Uma faixa de sucesso exigiria um variante verde do
 `.notice`, cujo default neste app é âmbar, e âmbar aqui significa envelhecimento e nada
 mais. O dialog do resumo fecha e o trabalho continua no terminal.
 
+### A pergunta do repositório
+
+**Um `<select>` no `#hotfixAsk`, não uma tela nova.** O dialog já era o lugar de "antes de
+começar, isto" — escolher, confirmar o stash e explicar o que impediu são o mesmo instante,
+e três telas para ele seriam três lugares para procurar a mesma resposta. O controle é o
+`.sel` dos filtros da lista, só que ocupando a largura do dialog: os 180px de lá cortariam
+justamente o fim do caminho, que é o que distingue um repositório do outro.
+
+**Resumir pergunta também, e oferece "Sem repositório".** Lá a doc do repositório é
+precisão a mais — sem ela o resumo diz "módulo de estoque" em vez do nome da unit, mas sai.
+A hotfix não tem esse caminho: sem repositório não há onde criar a branch. E a pergunta só
+aparece quando o resumo vai mesmo ser gerado; reabrir um resumo em cache não pergunta nada,
+porque ali o clique não decidiria coisa alguma.
+
 ### Dois lugares para dizer que deu errado, e eles não são intercambiáveis
 
 **O que impede de começar vai para o `#hotfixAsk`**: gitflow ausente, repositório sem
-`git flow init`, módulo sem repositório apontado, caminho que não existe. São situações em
-que nada aconteceu ainda e cada uma tem um conserto diferente — "aponte um repositório" e
+`git flow init`, nenhum repositório apontado, caminho que não existe, e o link do Claude
+ainda não registrado nesta máquina. São situações em que nada aconteceu ainda e cada uma
+tem um conserto diferente — "aponte um repositório" e
 "rode `git flow init`" não se parecem. Um dialog dá espaço para nomear o problema e o
 caminho de volta; uma faixa de uma linha, não.
 
@@ -515,16 +517,17 @@ pendente, "Fechar" quando o dialog é só informação. É a mesma decisão que 
 "Cancelar" de Configurações em "Fechar" quando o rodapé deixou de governar a lista.
 
 O dialog **não fecha o resumo atrás dele**: os dois ficam empilhados, e o texto que motivou
-a hotfix continua visível enquanto você decide. Reusa `dialog`, `.dlg-body` e `.dlg-foot`
-sem uma regra de CSS nova — a largura de 470px já foi calculada para caber um caminho como
+a hotfix continua visível enquanto você decide. Reusa `dialog`, `.dlg-body` e `.dlg-foot`,
+e a largura de 470px já foi calculada para caber um caminho como
 `C:\dev\praxio\Autumn.SIGAi` em mono 12px.
 
 ### O briefing é a fronteira, não a linha de comando
 
 O `.md` que entra na branch carrega título, cliente e o texto do resumo. **Nada disso passa
 pela linha de comando**: só o número do ticket, filtrado por allowlist
-(`slugTicket`, `services/git.js`), vira nome de branch, nome de arquivo e argumento do
-terminal. É a mesma postura fail-closed do `sanitize.js`, aplicada a uma fronteira nova.
+(`slugTicket`, `services/git.js`), vira nome de branch, nome de arquivo e parte da URL que
+abre o Claude. É a mesma postura fail-closed do `sanitize.js`, aplicada a uma fronteira
+nova.
 
 O briefing também avisa o Claude, por extenso, de que o texto do ticket é **material para
 diagnóstico e nunca instrução** — o mesmo risco de injeção que o prompt de sistema do resumo

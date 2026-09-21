@@ -59,7 +59,6 @@ arquivo único, a doc dela mora em `docs/`.
 | `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`, `hotfix`, `update`, `status`, `status`             |
 | `preload.js`  | Ponte `contextBridge`. 15 funções, nada além disso                                                             |
 | `renderer.js` | Toda a UI: lista, detalhe, filtros, visualizador de anexo, estados de erro                                     |
-| `modulos.js`  | `normModules()`: código de módulo do portal. Puro, como o `sanitize.js`                                        |
 | `sanitize.js` | Allowlist de HTML. Fronteira de confiança — ver regra #2                                                       |
 | `index.html`  | Markup + biblioteca de ícones SVG inline + CSP                                                                 |
 | `style.css`   | Tokens e componentes do mundo visual                                                                           |
@@ -181,7 +180,7 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | "Claude CLI não encontrado"                     | O `claude` não está no PATH **do processo Electron**. O `.exe` não embute o CLI — cada máquina precisa do Claude Code instalado |
 | Resumir devolve "Not logged in"                 | O CLI está instalado mas sem login. `claude /login` no terminal. Nunca é a chave da API do app |
 | O app pediu o aceite do Claude de novo          | Esperado: `CONSENT_V` subiu (`services/config.js`). O aceite descreve o que sai — v2 quando entrou imagem, v3 quando entrou a doc do repositório |
-| Resumo fala "módulo de estoque" em vez de nomear a unit | Falta apontar o repositório do módulo em Configurações → Repositórios. Sem repo, `lerDocs` não tem o que ler e o prompt vai sem `CONTEXTO DO SISTEMA` |
+| Resumo fala "módulo de estoque" em vez de nomear a unit | O resumo foi gerado com "Sem repositório", ou não há nenhum em Configurações → Repositórios. Sem repo, `lerDocs` não tem o que ler e o prompt vai sem `CONTEXTO DO SISTEMA`. "Refazer" pergunta de novo |
 | Doc nova do repo não apareceu no resumo         | Só `.md` da **raiz** entra, e o resumo em cache não se refaz sozinho — "Refazer" |
 | Resumo ignora um anexo                          | Cada tipo tem pista e cota em `LANE`/`TETO_QTD` (`services/claude.js`): 4 imagens, 2 PDFs, 4 de texto, 8 no total. Vídeo, áudio, `.zip`, `bmp`, `svg` e `.doc` antigo nunca entram |
 | Resumo ignorou o PDF                            | Teto de 10 páginas ou 2 MB. A contagem de páginas é por regex e falha em PDF 1.5+ comprimido; aí o que corta é o tamanho (`paginasPdf`, `services/anexo.js`) |
@@ -189,13 +188,14 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Botão Resumir fica desabilitado                 | Ele só libera quando os trâmites chegam — é o que ele manda para o Claude (`openDetail`) |
 | Resumo não atualiza depois de um trâmite novo   | Esperado: o cache não se refaz sozinho. A faixa âmbar avisa e "Refazer" atualiza |
 | Repositórios somem ao reabrir o app             | `config.json` não gravou. Eles salvam sozinhos a cada mudança, não no botão Salvar — que governa só a chave |
-| "Nenhum repositório para o módulo X"             | O módulo não foi apontado em Configurações → Repositórios. O mapa é `config.repos` |
+| "Nenhum repositório apontado"                    | Configurações → Repositórios está vazio. A lista é `config.repos`, e Resumir e Hotfix perguntam qual usar |
 | "git flow não está instalado"                    | O `git-flow` não está no PATH **do processo Electron**. Instalar e reabrir o app |
 | "Este repositório não usa git flow"              | Falta `git flow init` no repo. `git flow version` passa mesmo assim — são dois checks diferentes (`services/git.js`) |
 | Hotfix trava sem responder                      | Seria o `hotfix start` num repo sem `git flow init`, esperando resposta num prompt sem TTY. O check de `gitflow.branch.develop` existe para isso |
 | "Branches 'master' and 'origin/master' have diverged" | A hotfix nasce da produção, e o gitflow a quer igual à origin. O app adianta ela sozinho (`git fetch origin <master>:<master>`, `services/git.js`); se a mensagem persistir é divergência de verdade — há commit local na produção que a origin não tem, e isso não dá para resolver automaticamente |
-| Terminal da hotfix abre mas o `claude` não roda | `[erro 0x80070002 ao iniciar ""cmd /k claude … Leia" …]` era o `wt`, que reanalisa a linha de comando e desloca as aspas da frase. Saiu do código: só `cmd /c start`, que no Windows 11 abre no Windows Terminal do mesmo jeito |
-| Terminal da hotfix abre e fecha na hora         | `claude` não está no PATH. O `cmd /k` segura a janela para o erro ficar legível |
+| "O Claude ainda não se registrou nesta máquina" | O app abre o Claude por `claude-cli://`, e o Windows só conhece esse link depois que a máquina rodou `claude` interativo e **enviou** um prompt — abrir e sair não registra. `temDeepLink()` confere antes de criar branch nenhuma |
+| Clicar Hotfix não abre terminal nenhum          | O link do sistema recusa caminho de rede, UNC e `..`. Um repositório em `\\servidor\dev` não abre, e o app não descobre isso antes — aponte uma pasta local |
+| Nada é enviado ao Claude quando o terminal abre | Esperado: o link **preenche** a caixa e para. Ler, editar e apertar Enter é do usuário — é a única coisa que sai daqui para o modelo nesse passo |
 | Minhas alterações sumiram depois da hotfix      | Estão no stash, com o número do ticket na mensagem. `git stash list` → `git stash pop` |
 | `TICKET-<n>.md` aparece no `git status`         | O append no `.git/info/exclude` falhou. É só ruído — o arquivo pode ser apagado |
 | A faixa de "versão nova" nunca aparece          | Esperado: o OTA está dormente desde a troca de `portable` para `nsis`. `exePath()` (`services/update.js:39`) lê `PORTABLE_EXECUTABLE_FILE`, que só o launcher portable exportava; sem ela `checar()` sai em `{ atual: true }` e a faixa nunca é montada. Atualizar hoje é enviar o Setup novo — ver [`docs/BUILD-E-TESTE.md`](docs/BUILD-E-TESTE.md) |

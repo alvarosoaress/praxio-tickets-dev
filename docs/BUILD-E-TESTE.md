@@ -112,7 +112,7 @@ Config dentro do `package.json`, sem arquivo separado:
   "appId": "com.alvaro.tickets",
   "productName": "Tickets",
   "files": ["main.js", "preload.js", "index.html", "renderer.js",
-            "sanitize.js", "modulos.js", "services/**/*", "ipc/**/*",
+            "sanitize.js", "services/**/*", "ipc/**/*",
             "style.css", "node_modules/**/*"],
   "win": { "target": "nsis" },
   "nsis": { "oneClick": true, "perMachine": false },

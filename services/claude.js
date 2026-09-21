@@ -1,9 +1,10 @@
 // Adaptador do Claude CLI. Nao conhece config nem IPC: recebe ticket + tramites e devolve
 // texto. Quem checa o consentimento do usuario e ipc/resumo.js.
-const { execFile, spawn } = require('child_process');
+const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { app } = require('electron');
+const { app, shell } = require('electron');
+const { deepLink } = require('./git');
 
 const MODEL = 'sonnet';
 const TIMEOUT_MS = 180_000;
@@ -406,37 +407,29 @@ function resumir(ticket, tramites, anexos, repo) {
   });
 }
 
-// O mesmo CLI em modo interativo: em vez de -p com stdin, uma janela de terminal que fica
-// aberta no repositorio. Aqui o cwd aponta PARA o repo, ao contrario do resumir() — este e
-// justamente o caso em que descobrir o CLAUDE.md e ler o codigo e o objetivo.
+// O mesmo CLI em modo interativo, mas o app nao manda nada: o deep link abre uma janela de
+// terminal no repositorio com a frase JA DIGITADA na caixa e parada ali — quem aperta Enter
+// e o usuario, depois de ler e editar. A URL e montada em services/git.js; aqui so se abre.
 //
-// --permission-mode plan porque o pedido e levantamento, nao conserto: o Claude investiga
-// sem escrever nada e termina propondo.
-//
-// Nada do ticket entra nesta linha de comando alem do nome do arquivo, e o slug que o
-// compoe passou pela allowlist de services/git.js. Titulo, cliente e o texto do resumo
-// vivem dentro do .md, que o CLI le do disco.
-function abrirNoTerminal(cwd, arquivo) {
-  const args = ['claude', '--permission-mode', 'plan',
-    `Leia ${arquivo} na raiz deste repositorio e faca o levantamento inicial descrito nele.`];
-  const opts = { cwd, detached: true, stdio: 'ignore' };   // unref: o terminal sobrevive ao app
+// O cwd aponta PARA o repo, ao contrario do resumir(): este e justamente o caso em que
+// descobrir o CLAUDE.md e ler o codigo e o objetivo.
 
-  // Um spawn so, e o `wt` NAO entra aqui — foi ele que quebrou a hotfix na pratica. O wt
-  // reanalisa a linha de comando com o parser dele e desloca as aspas da frase do prompt,
-  // virando `[erro 0x80070002 ao iniciar ""cmd /k claude --permission-mode plan Leia" ...]`:
-  // o que ele tenta executar e a frase inteira como se fosse o nome do programa.
-  //
-  // O `start` do cmd entrega os argumentos intactos — medido nas quatro combinacoes que
-  // importam (cwd do repo e do app, `claude` do PATH e caminho absoluto). E no Windows 11 o
-  // terminal padrao ja e o Windows Terminal, entao a janela abre nele do mesmo jeito.
-  //
-  // O titulo vazio ('') antes do programa nao e enfeite: sem ele o `start` toma o primeiro
-  // argumento entre aspas como titulo da janela e nao executa nada.
-  const cm = spawn('cmd', ['/c', 'start', '', 'cmd', '/k', ...args], opts);
-  cm.on('error', () => {});   // sem terminal nao ha o que fazer, e nao pode lancar
-  cm.unref();
+// O handler `claude-cli://` so existe depois que a maquina rodou `claude` interativo e
+// ENVIOU um prompt — abrir e sair nao registra. Sem ele o link nao faz nada visivel, entao
+// ipc/hotfix.js pergunta isto ANTES de criar branch nenhuma: falhar depois deixaria o
+// usuario numa branch nova sem entender o que aconteceu.
+const temDeepLink = () => new Promise(ok =>
+  execFile('reg', ['query', 'HKCU\\Software\\Classes\\claude-cli'], { windowsHide: true }, e => ok(!e)));
+
+// openExternal e nao um `cmd /c start`: o Node so poe aspas em argumento que tem espaco ou
+// aspas, nunca em `&`, e o cmd cortaria a URL no & que separa cwd de q. Aqui o SO recebe a
+// URL inteira sem passar por shell nenhum — e de quebra o `wt`, que ja quebrou esta funcao
+// uma vez reanalisando as aspas, deixa de estar no caminho.
+function abrirNoTerminal(cwd, arquivo) {
+  // sem terminal nao ha o que fazer, e handler de IPC nao pode lancar
+  shell.openExternal(deepLink(cwd, arquivo)).catch(() => {});
 }
 
-module.exports = { buildPrompt, buildContent, parseResult, parseSize, escolherAnexos, ehEscalacao, lerDocs, resumir, abrirNoTerminal,
+module.exports = { buildPrompt, buildContent, parseResult, parseSize, escolherAnexos, ehEscalacao, lerDocs, resumir, abrirNoTerminal, temDeepLink,
   LANE, IMG_MIME, MAX_PROMPT_CHARS, MAX_TRAMITE_CHARS, MAX_DOCS_CHARS, MAX_IMAGENS, MAX_PDFS, MAX_TEXTOS,
   MAX_IMG_BYTES, MAX_PDF_BYTES, MAX_PDF_PAGINAS, MAX_TEXTO_CHARS, MAX_TEXTO_TOTAL, MAX_ANEXOS };

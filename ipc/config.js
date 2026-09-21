@@ -1,6 +1,5 @@
 const { ipcMain, dialog, BrowserWindow } = require('electron');
 const { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos } = require('../services/config');
-const { normModules, unicos } = require('../modulos');
 
 const MAX_REPOS = 20;
 const MAX_PATH = 400;
@@ -12,7 +11,11 @@ const MAX_PATH = 400;
 //
 // Existencia da pasta NAO e checada de proposito: o repo pode estar num drive offline ou
 // ainda nao clonado, e reprovar a lista toda por uma linha faria o autosave perder as
-// linhas boas. Nada consome esses caminhos ainda.
+// linhas boas. Quem descobre que o caminho nao presta e o probe da hotfix, na hora, com
+// mensagem propria para cada caso.
+//
+// A ordem da lista e o contrato: ipc/hotfix.js e ipc/resumo.js recebem do renderer o
+// indice de uma linha daqui. Por isso linha descartada some antes de gravar, e nao depois.
 function limpar(list) {
   if (!Array.isArray(list)) return null;
   const validos = [];
@@ -20,11 +23,9 @@ function limpar(list) {
     if (!r || typeof r !== 'object') continue;
     const p = typeof r.path === 'string' ? r.path.trim().slice(0, MAX_PATH) : '';
     if (!p) continue;
-    validos.push({ path: p, modules: r.modules });
+    validos.push({ path: p });
   }
-  // unicos() so depois de descartar caminho vazio: linha que nem vai ser gravada nao pode
-  // reservar um modulo e some-lo da linha seguinte.
-  return unicos(validos);
+  return validos;
 }
 
 function register() {

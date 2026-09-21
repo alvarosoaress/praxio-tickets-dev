@@ -274,6 +274,12 @@ input { caret-color: var(--amber); }
 
 .sel:hover svg, .sel:has(select[data-active="1"]) svg { color: var(--text-dim); }
 
+/* No dialog o select nao divide a barra com ninguem, e o que ele mostra e um caminho de
+   disco: os 180px dos filtros da lista cortariam justamente o que distingue um repositorio
+   do outro. */
+.sel-wide { display: flex; margin-bottom: 16px; }
+.sel-wide select { flex: 1; max-width: none; }
+
 select {
   height: 28px;
   padding: 0 26px 0 9px;
@@ -967,11 +973,6 @@ select option { background: var(--surface-2); color: var(--text); }
 
 #cfg .dlg-body { flex: 1; min-height: 0; overflow: auto; }
 
-/* O popup do <datalist> e chrome do browser e CSS nao o alcanca. Sem color-scheme ele
-   abre branco em cima de um app quase preto. Escopo no input de proposito: no :root
-   mexeria em scrollbar nativa, select, caret e autofill de uma vez. */
-#cfg input[list] { color-scheme: dark; }
-
 /* Filete de 1px separa as secoes. Caixa em volta seria card dentro de card. */
 .dlg-body h3 { padding-top: 17px; border-top: 1px solid var(--line); }
 .dlg-body h2 + h3 { margin-top: 14px; padding-top: 0; border-top: 0; }
@@ -1002,24 +1003,7 @@ select option { background: var(--surface-2); color: var(--text); }
 .repo-input:focus { border-color: #4a5563; }
 .repo-input::placeholder { color: var(--text-faint); }
 
-.repo-mods { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 7px; }
-
-/* Codigo de modulo e dado medido: mesmo registro do .meta .mod da lista. Nao reusa
-   .chip — aquele e chip de arquivo, e la [data-preview="0"] ja significa "sem preview". */
-.mchip {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  height: 22px;
-  padding: 0 3px 0 8px;
-  border: 1px solid var(--line-2);
-  border-radius: 4px;
-  background: var(--surface-2);
-  font: 500 11px/1 var(--mono);
-  letter-spacing: .04em;
-  color: var(--text-dim);
-}
-
+/* Sobreviveu ao fim dos chips de modulo: a aba reusa o mesmo X — ver .tab .mchip-x. */
 .mchip-x {
   display: inline-flex;
   padding: 3px;
@@ -1033,25 +1017,6 @@ select option { background: var(--surface-2); color: var(--text); }
 
 .mchip-x svg { width: 11px; height: 11px; }
 .mchip-x:hover { color: var(--text); background: #262c35; }
-
-/* Tracejado = lugar vazio a preencher, o mesmo sentido que ele ja tem no .tr-img. */
-.mod-input {
-  width: 98px;
-  height: 22px;
-  padding: 0 7px;
-  border: 1px dashed var(--line-2);
-  border-radius: 4px;
-  background: none;
-  color: var(--text);
-  font: 400 11px/1 var(--mono);
-  letter-spacing: .04em;
-  outline: none;
-  user-select: text;
-  transition: border-color .15s var(--ease);
-}
-
-.mod-input:focus { border-color: #4a5563; border-style: solid; }
-.mod-input::placeholder { color: var(--text-faint); letter-spacing: 0; }
 
 .repo-none { margin: 0 0 11px; font-size: 12.5px; color: var(--text-faint); }
 

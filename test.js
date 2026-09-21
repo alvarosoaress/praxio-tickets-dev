@@ -7,8 +7,7 @@ const { buildPrompt, buildContent, parseResult, parseSize, escolherAnexos, lerDo
         MAX_IMAGENS, MAX_PDFS, MAX_TEXTOS, MAX_ANEXOS, MAX_TEXTO_TOTAL } = require('./services/claude.js');
 const { respHeaders } = require('./services/anexo.js');
 const { parseResumo } = require('./renderer.js');
-const { normModules, unicos, repoDe, MAX_MODULES } = require('./modulos.js');
-const { slugTicket, buildBriefing, jaExiste, MAX_SLUG } = require('./services/git.js');
+const { slugTicket, deepLink, buildBriefing, jaExiste, MAX_SLUG } = require('./services/git.js');
 const { maisNova } = require('./services/update.js');
 
 // parser: o portal manda "DD/MM/YYYY HH:mm:ss", que new Date() le como MM/DD
@@ -249,32 +248,6 @@ assert.strictEqual(aposFechar(3, 0, 2), 0, 'fechar aba inativa a direita nao tro
 assert.strictEqual(aposFechar(3, 2, 0), 1, 'fechar aba inativa a esquerda so desloca o indice');
 assert.strictEqual(aposFechar(3, null, 1), null, 'quem esta na Fila continua na Fila');
 
-// modulos: o usuario digita livre ("wtr, wcx") e o mesmo normalizador recebe o array vindo
-// do IPC, onde nada e confiavel. Caixa errada gravaria dois modulos para o mesmo codigo.
-assert.deepStrictEqual(normModules('wtr, wcx'), ['WTR', 'WCX']);
-assert.deepStrictEqual(normModules('WTR  wtr ,wtr;WTR'), ['WTR'], 'dedupe depois de normalizar a caixa');
-assert.deepStrictEqual(normModules(''), []);
-assert.deepStrictEqual(normModules(null), []);
-
-// vindo do renderer pelo IPC: nao-string e descartado, nunca convertido — String({})
-// gravaria "[object Object]" no config.json, que e o mesmo arquivo da chave da API
-assert.deepStrictEqual(normModules(['wce', 42, null, {}, ['x'], 'WCE']), ['WCE']);
-assert.deepStrictEqual(normModules({}), [], 'objeto solto nao vira lista');
-
-// teto: o config.json guarda a chave da API, entao nada entra sem limite
-assert.strictEqual(normModules(Array.from({ length: 200 }, (_, i) => 'M' + i)).length, MAX_MODULES);
-
-// um modulo mora num repositorio so: o primeiro fica com ele. Sem isto, apontar WTR para
-// um repo novo deixaria o antigo respondendo pelo mesmo modulo, e nada na tela diria qual
-// dos dois vale.
-const u = unicos([{ path: 'A', modules: ['wtr', 'wcx'] }, { path: 'B', modules: ['WCX', 'wce'] }]);
-assert.deepStrictEqual(u.map(r => r.modules), [['WTR', 'WCX'], ['WCE']]);
-assert.deepStrictEqual(unicos([{ path: 'A', modules: ['WTR'] }, { path: 'B', modules: ['WTR'] }])[1].modules, []);
-assert.deepStrictEqual(unicos([]), []);
-assert.deepStrictEqual(unicos(null), []);
-// o caminho nao pode ser perdido no caminho
-assert.strictEqual(unicos([{ path: 'A', modules: [] }])[0].path, 'A');
-
 console.log('ok');
 
 
@@ -294,16 +267,17 @@ assert.strictEqual(slugTicket(null), null);
 assert.strictEqual(slugTicket('///'), null, 'so caractere proibido tambem e null');
 assert.ok(slugTicket('9'.repeat(200)).length <= MAX_SLUG);
 
-// modulo -> repositorio: o portal manda o modulo como quiser, o config guarda o que o
-// usuario digitou. Os dois lados passam por normModules, entao caixa nao pode decidir.
-const REPOS = [{ path: 'C:\dev\a', modules: ['WTR'] }, { path: 'C:\dev\b', modules: ['WCX', 'WCE'] }];
-assert.strictEqual(repoDe(REPOS, 'wtr').path, 'C:\dev\a');
-assert.strictEqual(repoDe(REPOS, 'WCE').path, 'C:\dev\b');
-assert.strictEqual(repoDe(REPOS, 'WTR - Transporte').path, 'C:\dev\a', 'modulo com sufixo do portal ainda casa');
-assert.strictEqual(repoDe(REPOS, 'WMS'), null, 'modulo sem repo apontado e null, nao o primeiro da lista');
-assert.strictEqual(repoDe(REPOS, ''), null);
-assert.strictEqual(repoDe([], 'WTR'), null);
-assert.strictEqual(repoDe(null, null), null);
+// deep link: a URL passa por um handler do SO, e um espaco ou uma quebra crua ali ja
+// bastam para ele receber outra coisa. O & tem que ser exatamente um — o que separa cwd de
+// q. Dois significariam que algo do texto virou parametro.
+const dl = deepLink('C:\\dev\\a b', 'TICKET-938963.md');
+assert.ok(dl.startsWith('claude-cli://open?cwd='));
+assert.ok(!/[ \n]/.test(dl), 'espaco ou quebra crua no link: o handler recebe outra coisa');
+assert.strictEqual(dl.split('&').length, 2, 'so o & que separa cwd de q');
+assert.ok(dl.includes('%5Cdev%5C'), 'a barra invertida do caminho do Windows tem que sair codificada');
+const q = decodeURIComponent(dl.split('&q=')[1]);
+assert.ok(q.includes('TICKET-938963.md'));
+assert.ok(q.startsWith('Nao altere nenhum arquivo'), 'sem --permission-mode, a proibicao de escrever e a primeira linha');
 
 // briefing: leva o resumo e os metadados, e avisa o Claude de que o texto do ticket e
 // material, nao ordem — e o mesmo risco de injecao que o SYSTEM_PROMPT ja trata
@@ -328,7 +302,7 @@ assert.ok(!jaExiste(null));
 
 // empacotamento: o .exe leva SO o que esta em build.files, e esquecer um arquivo ali nao
 // da erro nenhum no `npm start` — so no executavel, e no boot, porque os require ficam no
-// topo dos modulos. Foi o que aconteceu com o modulos.js. Nao e logica, mas mora aqui pelo
+// topo dos modulos. Ja aconteceu com um arquivo de raiz. Nao e logica, mas mora aqui pelo
 // mesmo motivo que o resto: quebra em silencio.
 const fs = require('fs');
 const pkgFiles = JSON.parse(fs.readFileSync('./package.json', 'utf8')).build.files;
@@ -348,7 +322,6 @@ for (const dir of ['.', './ipc', './services']) {
   }
 }
 
-assert.ok(precisa.has('modulos.js'), 'a varredura tem que enxergar o modulos.js');
 assert.ok(precisa.has('sanitize.js') && precisa.has('renderer.js'), 'e os outros arquivos de raiz');
 for (const f of precisa) {
   assert.ok(pkgFiles.includes(f), `${f} e carregado em runtime mas falta em build.files: o .exe quebraria no boot`);

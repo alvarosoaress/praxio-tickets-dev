@@ -34,21 +34,13 @@ de IPC. Quem faz a ponte é [`../ipc/`](../ipc/CLAUDE.md).
 
 ## Por que `git.js` não importa `electron`
 
-É o único. `slugTicket` — a allowlist que separa o portal da linha de comando — e
-`buildBriefing` são puros, e o `test.js` precisa importá-los sem subir Electron. Mesma
-relação que o `modulos.js` tem com a raiz.
+É o único. `slugTicket` — a allowlist que separa o portal da linha de comando —,
+`buildBriefing` e `deepLink` são puros, e o `test.js` precisa importá-los sem subir
+Electron.
 
-A abertura do terminal ficou em `claude.js`, e não aqui: o sistema externo continua sendo o
-CLI `claude`, só que interativo em vez de `-p`. Lá o `cwd` aponta **para** o repo, ao
-contrário do `resumir()` — é justamente o caso em que descobrir o `CLAUDE.md` e ler o
-código é o objetivo.
-
-O `wt` **não** entra nessa abertura, e isso foi medido na marra: ele reanalisa a linha de
-comando com o parser dele e desloca as aspas da frase do prompt, tentando executar a frase
-inteira como nome de programa (`[erro 0x80070002 ao iniciar ""cmd /k claude … Leia" …]`). O
-`start` do `cmd` entrega os argumentos intactos nas quatro combinações que importam (cwd do
-repo e do app, `claude` do PATH e caminho absoluto) — e no Windows 11 a janela abre no
-Windows Terminal de qualquer jeito, porque ele é o terminal padrão.
+`deepLink` mora aqui, e não no adaptador do Claude, pelo mesmo motivo que o `buildBriefing`:
+o que ele monta depende do nome de arquivo que o `slugTicket` acima torna seguro, e a
+fronteira e o que a atravessa ficam melhor no mesmo arquivo.
 
 Três coisas medidas, não supostas: `git flow version` responde 0 até **fora** de um
 repositório, então ele só diz que o gitflow está instalado — quem diz que o repo foi
@@ -59,6 +51,32 @@ exige a branch de **produção** igual à origin, não só a develop — por iss
 `pull` da develop, vem um `git fetch origin <master>:<master>`, que adianta a produção sem
 trocar de branch e sem forçar. Falhar ali não interrompe: quem decide se pode começar
 continua sendo o gitflow, que dá a mensagem certa.
+
+## Como o `claude` da hotfix abre
+
+Não abre por `spawn`. `abrirNoTerminal` (`claude.js`) chama `shell.openExternal` com uma
+URL `claude-cli://open?cwd=…&q=…`, e o Windows entrega ao handler que o Claude Code
+registra. O `cwd` aponta **para** o repo, ao contrário do `resumir()` — é justamente o caso
+em que descobrir o `CLAUDE.md` e ler o código é o objetivo.
+
+**A caixa abre preenchida e não enviada.** É o comportamento documentado do deep link, e é
+a razão de ele ter substituído a linha de comando: o app sugere a pergunta, o usuário lê,
+edita e manda.
+
+O que isso trouxe junto:
+
+- **`--permission-mode plan` não existe no link.** A proibição de escrever virou a primeira
+  linha do texto — que agora está na tela antes de valer qualquer coisa, o que a flag nunca
+  esteve.
+- **`spawn` não serve para abrir a URL.** O Node só põe aspas em argumento que tem espaço
+  ou aspas, nunca em `&`, e um `cmd /c start "" <url>` cortaria a URL no `&` que separa
+  `cwd` de `q`. `openExternal` não passa por shell nenhum — e de quebra tira do caminho o
+  `wt`, que já quebrou esta função uma vez reanalisando as aspas do prompt
+  (`[erro 0x80070002 ao iniciar ""cmd /k claude … Leia" …]`).
+- **O handler pode não existir.** Ele só é registrado depois que a máquina rodou `claude`
+  interativo e **enviou** um prompt; abrir e sair não registra. `temDeepLink()` lê
+  `HKCU\Software\Classes\claude-cli`, e `ipc/hotfix.js` chama isso **antes** do probe —
+  falhar depois deixaria o usuário numa branch nova sem terminal e sem explicação.
 
 ## Por que `resumos.js` e `status.js` não usam o `config.json`
 
@@ -100,13 +118,14 @@ descobrir o `CLAUDE.md` deste repo.
 
 ## A doc do repositório dentro do prompt
 
-`lerDocs(repo)` lê os `.md` da **raiz** do repositório mapeado para o módulo do ticket e
+`lerDocs(repo)` lê os `.md` da **raiz** do repositório que o usuário escolheu e
 `buildPrompt` os coloca antes do cabeçalho, sob o rótulo `CONTEXTO DO SISTEMA`. É o que faz
 o bloco ONDE dizer `VGCE.pas` / `CalculaSaldo` em vez de "módulo de estoque": o trâmite traz
 o sintoma, a doc traz o nome próprio.
 
-Quem resolve módulo → repositório é `ipc/resumo.js` — a regra 3 continua valendo, `claude.js`
-recebe um caminho e não conhece `config.js`.
+Qual repositório é o usuário quem diz, no dialog que `ipc/resumo.js` pede com
+`NEED_REPO` — a regra 3 continua valendo, `claude.js` recebe um caminho e não conhece
+`config.js`.
 
 Três decisões que parecem detalhe e não são:
 

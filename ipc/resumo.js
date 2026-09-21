@@ -1,6 +1,5 @@
 const { ipcMain } = require('electron');
 const { claudeOk, repos } = require('../services/config');
-const { repoDe } = require('../modulos');
 const { resumir, escolherAnexos, IMG_MIME, MAX_IMG_BYTES, MAX_PDF_BYTES, MAX_PDF_PAGINAS } = require('../services/claude');
 const { anexoBytes } = require('../services/portalapi');
 const { toPlain, paginasPdf } = require('../services/anexo');
@@ -46,7 +45,7 @@ async function carregarAnexos(escolhidos) {
 }
 
 function register() {
-  ipcMain.handle('resumo', async (_e, { id, ticket, tramites, refazer }) => {
+  ipcMain.handle('resumo', async (_e, { id, ticket, tramites, refazer, repoIdx }) => {
     if (!/^\d+$/.test(String(id))) return { error: 'ID de ticket inválido.' };
     // O conteudo do ticket sai da maquina; sem o aceite explicito, nada e enviado.
     if (!claudeOk()) return { error: 'NO_CONSENT' };
@@ -60,14 +59,19 @@ function register() {
       if (hit) return { text: hit.text, cached: true, stale: hit.lastUpdate !== lastUpdate, at: hit.at || null };
     }
 
+    // Só quem vai gerar precisa de repositorio, e por isso a pergunta vem depois do cache:
+    // o caso comum e abrir um resumo que ja existe, e ali um dialog seria um clique que nao
+    // decide nada. NEED_REPO devolve a vez ao renderer, que pergunta e rechama com o indice.
+    if (repoIdx === undefined || repoIdx === null) return { error: 'NEED_REPO' };
+
     const at = new Date().toISOString();
     // Id de anexo continua validado do lado de la (anexoBytes), e so entra aqui anexo que
     // veio dos proprios tramites — o renderer nunca escolhe qual arquivo sai da maquina.
     const { anexos } = escolherAnexos(tramites);
-    // O mesmo mapa modulo->repo da hotfix, e resolvido do mesmo jeito: o renderer manda o
-    // ticket, nunca um caminho. Sem repositorio apontado o resumo sai como sempre saiu —
-    // a doc e precisao a mais, nao pre-requisito.
-    const repo = repoDe(repos(), (ticket && ticket.module) || '');
+    // Indice da lista salva, como na hotfix: o renderer aponta uma opcao que ja viu, nunca
+    // um caminho. -1 (ou indice que nao existe) e "seguir sem repositorio" — o resumo sai
+    // como sempre saiu, porque a doc e precisao a mais e nao pre-requisito.
+    const repo = repos()[Number(repoIdx)];
     const res = await resumir(ticket, tramites, await carregarAnexos(anexos), repo && repo.path);
     if (!res.text) return res;
     cache.set(id, lastUpdate, res.text, at);

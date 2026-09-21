@@ -27,8 +27,9 @@ const CONSENT_V = 3;
 const claudeOk = () => readCfg().claudeOk === CONSENT_V;
 const setClaudeOk = () => writeCfg({ ...readCfg(), claudeOk: CONSENT_V });
 
-// Mapa [{ path, modules }] de repositorio local para modulos do portal. Quem valida a
-// forma e ipc/config.js; aqui so le e grava.
+// Lista [{ path }] dos repositorios locais do usuario. E uma lista, e nao um mapa: quem
+// escolhe qual usar e o usuario, no momento em que clica — o app nao adivinha mais pelo
+// modulo do portal. Quem valida a forma e ipc/config.js; aqui so le e grava.
 const repos = () => { const r = readCfg().repos; return Array.isArray(r) ? r : []; };
 const setRepos = list => writeCfg({ ...readCfg(), repos: list });
 

@@ -1,8 +1,8 @@
 'use strict';
 
 // Adaptador do binario `git` do PATH. Unico services/ que NAO importa electron, e isso e
-// de proposito: slugTicket e buildBriefing sao puros e o test.js precisa importa-los sem
-// subir o Electron — mesma razao de modulos.js morar na raiz.
+// de proposito: slugTicket, buildBriefing e deepLink sao puros e o test.js precisa
+// importa-los sem subir o Electron.
 //
 // Nunca lanca: { ...dados } ou { error }, como todo services/.
 const { execFile } = require('child_process');
@@ -13,9 +13,9 @@ const TIMEOUT_MS = 60_000;
 const MAX_SLUG = 40;
 const PREFIX_PADRAO = 'hotfix/';
 
-// A fronteira com a linha de comando. O slug vira nome de branch, nome de arquivo E
-// argumento de `cmd /k` quando o terminal abre — tres lugares onde um caractere errado
-// custa caro. Por isso e allowlist e nao escape: fail-closed, como o sanitize.js.
+// A fronteira com o mundo de fora do app. O slug vira nome de branch, nome de arquivo E
+// parte da URL que abre o Claude — tres lugares onde um caractere errado custa caro. Por
+// isso e allowlist e nao escape: fail-closed, como o sanitize.js.
 //
 // Run de caractere proibido vira um hifen so, e ponto/hifen nas pontas somem: e o que mata
 // "../.." (a barra vai embora e os pontos da frente sao aparados) sem precisar de um check
@@ -24,6 +24,23 @@ function slugTicket(number) {
   const bruto = String(number == null ? '' : number).trim();
   const filtrado = bruto.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, MAX_SLUG);
   return filtrado.replace(/^[-.]+|[-.]+$/g, '') || null;
+}
+
+// A URL que abre o Claude no repositorio com a frase ja digitada na caixa e NAO enviada
+// (deep link `claude-cli://`, docs.claude.com/docs/en/deep-links). Mora aqui, e nao no
+// adaptador do Claude, por dois motivos: depende do nome de arquivo que o slugTicket acima
+// torna seguro, e e puro — o test.js importa sem subir o Electron.
+//
+// Nada do ticket entra na URL alem desse nome. Titulo, cliente e resumo vivem dentro do
+// .md, que o CLI le do disco.
+//
+// O texto comeca proibindo a escrita porque o link nao aceita --permission-mode: a
+// instrucao que antes era flag agora e a primeira linha do que o usuario le antes de
+// mandar.
+function deepLink(cwd, arquivo) {
+  const q = 'Nao altere nenhum arquivo ainda: este primeiro passo e levantamento.\n'
+          + `Leia ${arquivo} na raiz deste repositorio e faca o levantamento inicial descrito nele.`;
+  return `claude-cli://open?cwd=${encodeURIComponent(cwd)}&q=${encodeURIComponent(q)}`;
 }
 
 // Puro: o briefing que o Claude le no repo. Tudo que veio do portal entra AQUI, dentro de
@@ -205,4 +222,4 @@ function escreverBriefing(repo, gitDir, slug, texto) {
   return { nome };
 }
 
-module.exports = { slugTicket, buildBriefing, jaExiste, probe, hotfix, escreverBriefing, MAX_SLUG };
+module.exports = { slugTicket, deepLink, buildBriefing, jaExiste, probe, hotfix, escreverBriefing, MAX_SLUG };

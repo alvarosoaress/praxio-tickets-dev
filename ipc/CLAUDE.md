@@ -25,10 +25,9 @@ tem que acontecer **antes** do ready. Separar os dois não é estilo, é ordem o
 2. **Validação mora aqui.** Id de ticket e de anexo são checados com `/^\d+$/` na entrada
    do handler, antes de qualquer chamada. O `services/` confia em quem chama.
 
-   `set-repos` usa `normModules()` do [`../modulos.js`](../modulos.js) e **isso não é
-   exceção à regra**: a *decisão* de rejeitar continua aqui, o arquivo só guarda a
-   expressão — mesma relação que o `sanitize.js` tem com o renderer. Ele mora na raiz, e
-   não em `services/`, porque o `test.js` precisa importá-lo sem subir o Electron.
+   `set-repos` descarta linha sem caminho **antes** de gravar, e não depois: a ordem da
+   lista é o contrato com `hotfix.js` e `resumo.js`, que recebem do renderer o índice de
+   uma linha dela.
 
 3. **Erro da API sai verbatim.** `/scrape-custom` devolve `401 "Falha no login"` quando o
    **servidor** falha ao logar no portal. Traduzir status HTTP para mensagem própria faz o
@@ -57,12 +56,17 @@ inicializado? workspace sujo?), a tela decide, e `hotfix-start` executa. O `star
 os mesmos checks** — o renderer não é confiável, e o usuário tem esse repositório aberto
 noutra janela o dia inteiro.
 
-O renderer manda `{ id, ticket }` e **nunca um caminho**: quem resolve módulo → repositório
-é este lado, contra `config.repos`. Mesmo espírito da regra de ouro #9.
+O renderer manda `{ id, ticket, repoIdx }` e **nunca um caminho**: `repoIdx` é o índice de
+uma linha de `config.repos`, e quem lê o caminho é este lado. O usuário aponta qual das
+opções que já viu; o main decide o que ela significa. Mesmo espírito da regra de ouro #9.
 
-Cada impedimento tem código próprio (`NO_REPO`, `NO_GITFLOW`, `NO_GITFLOW_INIT`, `NO_DIR`,
-`NO_GIT`, `NO_RESUMO`, `NO_SLUG`) porque o conserto de cada um é diferente. Erro do git no
-meio da sequência não vira código: sai verbatim, com o `step` e o nome do stash junto.
+`NO_DEEPLINK` vem **antes** do probe, de propósito: sem o handler `claude-cli://` registrado
+a hotfix não teria como abrir nada no fim, e descobrir isso depois deixaria o usuário numa
+branch nova sem entender o que aconteceu.
+
+Cada impedimento tem código próprio (`NO_REPO`, `NO_DEEPLINK`, `NO_GITFLOW`,
+`NO_GITFLOW_INIT`, `NO_DIR`, `NO_GIT`, `NO_RESUMO`, `NO_SLUG`) porque o conserto de cada um
+é diferente. Erro do git no meio da sequência não vira código: sai verbatim, com o `step` e o nome do stash junto.
 
 ## `resumo.js`
 
@@ -77,11 +81,14 @@ Dois motivos para ele existir separado de `services/claude.js`:
   'NO_CONSENT' }` e não chama nada. O conteúdo do ticket sai da máquina; o usuário
   autoriza uma vez — e o aceite é versionado, porque ele descreve **o que** sai
   (`CONSENT_V`, hoje 3).
-- **O repositório do módulo.** Mesmo `repoDe(repos(), ticket.module)` da hotfix: o renderer
-  manda o ticket, nunca um caminho. `services/claude.js` só recebe o caminho pronto e lê
-  dali os `.md` da raiz, que entram no prompt como contexto do sistema. Módulo sem
-  repositório apontado resume como sempre resumiu — a doc é precisão a mais, não
-  pré-requisito.
+- **O repositório.** Mesmo `repoIdx` da hotfix: o renderer aponta uma linha de
+  `config.repos`, nunca um caminho. `services/claude.js` só recebe o caminho pronto e lê
+  dali os `.md` da raiz, que entram no prompt como contexto do sistema.
+
+  A pergunta vem **depois do cache**, e é por isso que ela é um `{ error: 'NEED_REPO' }` em
+  vez de um argumento obrigatório: o caso comum é reabrir um resumo que já existe, e ali um
+  dialog seria um clique que não decide nada. `repoIdx: -1` é "seguir sem repositório" e
+  resume como sempre resumiu — a doc é precisão a mais, não pré-requisito.
 - **O cache.** Fica em disco, em `%APPDATA%	ickets
 esumos.json`
   ([`services/resumos.js`](../services/CLAUDE.md)), e **sobrevive ao restart** — reabrir o

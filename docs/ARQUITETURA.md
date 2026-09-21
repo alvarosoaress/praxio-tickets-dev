@@ -179,21 +179,27 @@ objeto cacheado mesmo que o usuário já tenha voltado para a lista.
 Sai do `#resumo` e termina num terminal fora do app. Duas chamadas, porque há uma pergunta
 no meio.
 
-1. `pedirHotfix()` (`renderer.js`) → canal `hotfix-probe` com `{ id, ticket }`.
-2. `ipc/hotfix.js` resolve o repositório: `repoDe(repos(), ticket.module)` contra
-   `config.repos`. **O renderer nunca manda caminho** — mesmo espírito da regra de ouro #9.
+1. `pedirHotfix()` (`renderer.js`) pergunta em qual repositório salvo trabalhar e manda o
+   **índice** da escolha no canal `hotfix-probe`, junto de `{ id, ticket }`.
+2. `ipc/hotfix.js` lê o caminho em `config.repos[repoIdx]`. **O renderer nunca manda
+   caminho** — mesmo espírito da regra de ouro #9. Antes de qualquer leitura de disco,
+   `temDeepLink()` confere que o handler `claude-cli://` existe nesta máquina: sem ele o
+   passo 6 não abriria nada, e a branch já teria sido criada.
 3. `git.probe()` roda quatro comandos de leitura, nesta ordem:
    `git flow version` (instalado?) → `git rev-parse --absolute-git-dir` (é repo?) →
    `git config --get gitflow.branch.develop` (inicializado?) → `git status --porcelain`.
-4. Impedimento volta como código (`NO_GITFLOW`, `NO_REPO`, …) e abre o `#hotfixAsk`.
+4. Impedimento volta como código (`NO_GITFLOW`, `NO_REPO`, `NO_DEEPLINK`, …) e abre o
+   `#hotfixAsk` — o mesmo dialog que acabou de fazer a pergunta do repositório.
    Workspace sujo volta como `dirty: N` e abre o mesmo dialog, agora com confirmação.
    Workspace limpo pula o dialog e vai direto para o passo 5.
 5. Canal `hotfix-start`, que **reroda os mesmos checks** e então executa:
    `git add -A` + `git stash push -m …` (se sujo) → `git checkout <develop>` →
    `git pull --ff-only` → `git flow hotfix start <slug>`.
 6. Escreve `TICKET-<slug>.md` no repo, acrescenta o nome ao `.git/info/exclude`, e chama
-   `abrirNoTerminal()` (`services/claude.js`), que dá `spawn` em `wt` com fallback para
-   `cmd`.
+   `abrirNoTerminal()` (`services/claude.js`): um `shell.openExternal` na URL
+   `claude-cli://open?cwd=…&q=…` que `deepLink()` (`services/git.js`) montou. O Windows
+   abre o terminal, e o Claude sobe **com a frase na caixa e não enviada** — quem aperta
+   Enter é o usuário.
 
 ### As três decisões que custaram medição
 

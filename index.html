@@ -256,15 +256,21 @@
   </form>
 </dialog>
 
-<!-- Um dialog para os tres casos que impedem ou condicionam a hotfix. Dois dialogs seriam
-     duas telas para o mesmo momento: "ainda nao deu para comecar, e por isto". Falha no
-     meio da sequencia NAO vem para ca — vai para a faixa .notice do resumo, que e onde o
-     app ja diz "rodou e quebrou" sem tirar da tela o que voce estava lendo. -->
+<!-- Um dialog para todos os momentos que cercam a hotfix: escolher o repositorio, avisar do
+     stash, e explicar o que impediu. Varios dialogs seriam varias telas para o mesmo
+     momento: "antes de comecar, isto". Falha no meio da sequencia NAO vem para ca — vai
+     para a faixa .notice do resumo, que e onde o app ja diz "rodou e quebrou" sem tirar da
+     tela o que voce estava lendo.
+
+     O select e o mesmo componente dos filtros da lista, so que ocupando a largura do
+     dialog: caminho de repositorio e longo, e cortar o que se esta escolhendo seria pedir
+     uma decisao sem mostrar as opcoes. -->
 <dialog id="hotfixAsk">
   <form method="dialog" id="hotfixAskForm">
     <div class="dlg-body">
       <h2 id="hotfixAskTitle"></h2>
       <p id="hotfixAskText"></p>
+      <span class="sel sel-wide" id="hotfixAskSel" hidden><select id="hotfixAskRepo" aria-label="Repositório"></select><svg viewBox="0 0 24 24"><use href="#i-chevron"/></svg></span>
     </div>
     <div class="dlg-foot">
       <button class="btn" type="button" id="hotfixAskNo">Fechar</button>
@@ -290,10 +296,9 @@
       </div>
 
       <h3>Repositórios</h3>
-      <p>Qual repositório local corresponde a cada módulo do portal. A relação fica só nesta máquina e salva sozinha — nada é lido do disco.</p>
+      <p>Os repositórios locais onde você trabalha. Resumir e Hotfix perguntam qual usar. A lista fica só nesta máquina e salva sozinha — nada é lido do disco.</p>
       <div id="cfgRepos"></div>
       <button class="btn" type="button" id="cfgAddRepo">Adicionar repositório</button>
-      <datalist id="cfgModulos"></datalist>
 
       <h3>Meus status</h3>
       <p>A marca é sua e fica só nesta máquina — o botão direito numa linha da lista aplica. Nome e cor salvam sozinhos.</p>
@@ -308,7 +313,6 @@
 </dialog>
 
 <script src="sanitize.js"></script>
-<script src="modulos.js"></script>
 <script src="renderer.js"></script>
 </body>
 </html>

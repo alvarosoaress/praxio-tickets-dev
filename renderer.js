@@ -119,8 +119,7 @@ function fillSelect(sel, values, allLabel, labelOf = v => v) {
   sel.dataset.active = sel.value ? '1' : '0';
 }
 
-// Valores distintos de um campo, na ordem do pt-BR. Usado pelos selects de filtro e pela
-// lista de modulos do dialog de configuracao.
+// Valores distintos de um campo, na ordem do pt-BR. Usado pelos selects de filtro.
 const uniq = key => [...new Set((tickets || []).map(t => t[key]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
 function syncSelects() {
@@ -971,7 +970,27 @@ async function openResumo(refazer) {
   $('resumoNotice').hidden = true;
   setResumindo(true);
 
-  const res = await window.api.resumo(id, t, (detail && detail.tramites) || [], Boolean(refazer));
+  const tram = (detail && detail.tramites) || [];
+  let res = await window.api.resumo(id, t, tram, Boolean(refazer));
+
+  // O main so pede o repositorio quando vai mesmo gerar: resumo em cache abre sem pergunta
+  // nenhuma. A barra para enquanto o dialog esta aberto — ela significa "o app esta
+  // trabalhando", e aqui quem esta e o usuario.
+  if (res.error === 'NEED_REPO') {
+    setResumindo(false);
+    const idx = await escolherRepo(true);
+    if (openResumo.token !== token) return;
+    // Desistir de um Refazer nao pode apagar o resumo que ja estava na tela — mesma regra
+    // do refresh da lista. Sem texto anterior nao ha o que segurar, entao fecha.
+    if (idx === null) {
+      if (tinhaTexto) $('resumoHotfix').disabled = false;
+      else closeResumo();
+      return;
+    }
+    setResumindo(true);
+    res = await window.api.resumo(id, t, tram, Boolean(refazer), idx);
+  }
+
   if (openResumo.token !== token) return;   // usuario fechou ou abriu outro ticket
   setResumindo(false);
 
@@ -1023,7 +1042,7 @@ function closeResumo() {
 // Codigos que o main devolve quando a hotfix nem chegou a comecar. Erro de git no meio da
 // sequencia nao esta aqui de proposito: ele vem como texto do proprio git e vai para a
 // faixa, nao para um dialog.
-const HOTFIX_CODIGOS = new Set(['NO_RESUMO', 'NO_SLUG', 'NO_REPO', 'NO_DIR', 'NO_GIT', 'NO_GITFLOW', 'NO_GITFLOW_INIT']);
+const HOTFIX_CODIGOS = new Set(['NO_RESUMO', 'NO_SLUG', 'NO_REPO', 'NO_DEEPLINK', 'NO_DIR', 'NO_GIT', 'NO_GITFLOW', 'NO_GITFLOW_INIT']);
 
 // Cada um destes tem um conserto diferente. Um "não foi possível criar a hotfix" para todos
 // faria o usuario adivinhar qual — a mesma razao da regra de ouro #5.
@@ -1033,8 +1052,10 @@ function hotfixErro(res) {
       'A hotfix entrega o resumo do ticket ao Claude, e este ticket ainda não tem um. Gere o resumo primeiro.'];
     case 'NO_SLUG': return ['Ticket sem número utilizável',
       'O portal não devolveu para este ticket um número que sirva de nome de branch.'];
-    case 'NO_REPO': return [`Nenhum repositório para o módulo ${res.module || '—'}`,
-      'Abra Configurações → Repositórios e aponte a pasta local que responde por esse módulo.'];
+    case 'NO_REPO': return ['Nenhum repositório apontado',
+      'Abra Configurações → Repositórios e aponte a pasta local onde a hotfix deve nascer.'];
+    case 'NO_DEEPLINK': return ['O Claude ainda não se registrou nesta máquina',
+      'O app abre o Claude por um link do sistema, e esse link só passa a existir depois que você roda "claude" num terminal e envia um prompt. Faça isso uma vez e tente de novo.'];
     case 'NO_DIR': return ['A pasta do repositório não existe',
       'O caminho apontado em Configurações não está acessível: drive desconectado, ou o repositório ainda não foi clonado.', res.repo];
     case 'NO_GIT': return ['Isso não é um repositório git',
@@ -1047,18 +1068,63 @@ function hotfixErro(res) {
   }
 }
 
+// Um dialog para os quatro momentos que cercam a hotfix: escolher o repositorio, avisar do
+// stash, e explicar o que impediu. Quatro telas para o mesmo instante ("antes de comecar,
+// isto") seriam quatro lugares para procurar a mesma resposta.
+//
+// Devolve uma promessa: o valor do select no confirmar, `true` quando nao ha select, e
+// null quando o usuario desiste — Cancelar, Esc ou clique fora dao no mesmo. Assim quem
+// chama le a pergunta de cima para baixo, sem calistenia de callback.
+//
 // O rotulo do botao de sair muda com o que ele faz: ha o que cancelar quando existe uma
 // acao pendente, e so o que fechar quando o dialog e informacao. Mesma decisao do #cfg.
-function abrirHotfixAsk(titulo, texto, codigo, confirmLabel) {
+let hotfixAskResp = null;
+const responderAsk = v => { const r = hotfixAskResp; hotfixAskResp = null; if (r) r(v); };
+
+function abrirHotfixAsk(titulo, texto, codigo, confirmLabel, opcoes) {
+  responderAsk(null);                     // pergunta nova nao deixa a anterior pendurada
+  $('hotfixAsk').close();                 // showModal num dialog ja aberto lanca
   $('hotfixAskTitle').textContent = titulo;
   const p = $('hotfixAskText');
   p.textContent = texto;
   if (codigo) p.append(el('br'), el('code', null, codigo));   // caminho e dado medido: mono
+
+  const sel = $('hotfixAskRepo');
+  sel.textContent = '';
+  $('hotfixAskSel').hidden = !opcoes;
+  for (const o of opcoes || []) sel.appendChild(new Option(o.t, o.v));
+
   const yes = $('hotfixAskYes');
   yes.hidden = !confirmLabel;
   if (confirmLabel) yes.textContent = confirmLabel;
   $('hotfixAskNo').textContent = confirmLabel ? 'Cancelar' : 'Fechar';
   $('hotfixAsk').showModal();
+  return new Promise(r => { hotfixAskResp = r; });
+}
+
+// Qual dos repositorios salvos usar. Devolve o INDICE na lista que o main acabou de
+// mandar — e ele quem tem os caminhos, e e essa ordem que hotfix-start vai reler.
+//
+// `semRepo` e o resumo: la a doc do repositorio e precisao a mais, entao "sem repositório"
+// e uma opcao e lista vazia nem chega a perguntar. A hotfix nao tem esse caminho: sem
+// repositorio nao ha onde criar a branch.
+async function escolherRepo(semRepo) {
+  const { repos = [] } = await window.api.getRepos();
+  if (!repos.length) {
+    if (semRepo) return -1;
+    const [titulo, texto] = hotfixErro({ error: 'NO_REPO' });
+    abrirHotfixAsk(titulo, texto, null, null);
+    return null;
+  }
+
+  const opcoes = repos.map((r, i) => ({ v: String(i), t: r.path }));
+  if (semRepo) opcoes.push({ v: '-1', t: 'Sem repositório' });
+
+  const v = await abrirHotfixAsk('Em qual repositório?',
+    semRepo ? 'O resumo lê os .md da raiz do repositório para chamar as units pelo nome.'
+            : 'A branch nasce da produção deste repositório, e o Claude abre dentro dele.',
+    null, 'Continuar', opcoes);
+  return v === null ? null : Number(v);
 }
 
 function setHotfixando(on) {
@@ -1072,31 +1138,31 @@ async function pedirHotfix() {
   const id = t && ticketId(t);
   if (!id) return;
 
+  const idx = await escolherRepo(false);
+  if (idx === null) return;
+
   setHotfixando(true);
-  const res = await window.api.hotfixProbe(id, t);
+  const res = await window.api.hotfixProbe(id, t, idx);
   setHotfixando(false);
 
   if (res.error) return hotfixFalhou(res);
 
   // Workspace limpo nao tem o que avisar: nada vai ser guardado, entao nao ha pergunta.
-  if (!res.dirty) return rodarHotfix();
+  if (res.dirty) {
+    const n = res.dirty === 1 ? '1 arquivo alterado' : `${res.dirty} arquivos alterados`;
+    const ok = await abrirHotfixAsk('Guardar as alterações antes?',
+      `Este repositório tem ${n} em ${res.branch}. Tudo vai para um stash antes de criar ${res.alvo} — nada se perde, e "git stash pop" traz de volta.`,
+      res.repo, 'Guardar e criar');
+    if (!ok) return;
+  }
 
-  const n = res.dirty === 1 ? '1 arquivo alterado' : `${res.dirty} arquivos alterados`;
-  abrirHotfixAsk('Guardar as alterações antes?',
-    `Este repositório tem ${n} em ${res.branch}. Tudo vai para um stash antes de criar ${res.alvo} — nada se perde, e "git stash pop" traz de volta.`,
-    res.repo, 'Guardar e criar');
-}
-
-async function rodarHotfix() {
-  const t = current;
-  const id = t && ticketId(t);
-  if (!id) return;
-
+  // t e id vao junto: entre as duas perguntas o usuario pode ter trocado de aba, e reler
+  // `current` aqui criaria a hotfix do ticket errado.
   setHotfixando(true);
-  const res = await window.api.hotfixStart(id, t);
+  const r = await window.api.hotfixStart(id, t, idx);
   setHotfixando(false);
 
-  if (res.error) return hotfixFalhou(res);
+  if (r.error) return hotfixFalhou(r);
   closeResumo();   // sucesso nao tem faixa: o terminal abrindo e a confirmacao
 }
 
@@ -1290,21 +1356,8 @@ async function openConfig() {
   renderStatus();
 }
 
-// Os modulos saem da fila ja carregada — nao existe rota que os liste. Na primeira
-// execucao nao ha tickets, o datalist fica vazio e a digitacao livre continua valendo.
-//
-// O que ja pertence a algum repositorio sai da lista: um modulo mora num lugar so, entao
-// oferece-lo de novo seria oferecer um movimento como se fosse uma adicao.
-function fillDatalist() {
-  const dl = $('cfgModulos');
-  const usados = new Set(cfgRepos.flatMap(r => r.modules || []));
-  dl.textContent = '';
-  for (const m of uniq('module')) if (!usados.has(m)) dl.appendChild(new Option(m));
-}
-
 function renderRepos() {
   const box = $('cfgRepos');
-  fillDatalist();          // unico ponto por onde toda mudanca de modulo passa
   box.textContent = '';
   if (!cfgRepos.length) {
     box.appendChild(el('p', 'repo-none', 'Nenhum repositório apontado.'));
@@ -1338,40 +1391,14 @@ function repoRow(r, i) {
   const path = el('div', 'repo-path');
   path.append(inp, pick, del);
 
-  const mods = el('div', 'repo-mods');
-  for (const m of r.modules || []) mods.appendChild(modChip(m));
-  const add = el('input', 'mod-input');
-  add.type = 'text';
-  add.setAttribute('list', 'cfgModulos');
-  add.placeholder = '+ módulo';
-  add.spellcheck = false;
-  add.autocomplete = 'off';
-  add.setAttribute('aria-label', 'Adicionar módulo');
-  mods.appendChild(add);
-
-  row.append(path, mods);
+  row.append(path);
   return row;
-}
-
-function modChip(m) {
-  const c = el('span', 'mchip');
-  c.appendChild(el('span', null, m));
-  const x = el('button', 'mchip-x');
-  x.type = 'button';
-  x.dataset.act = 'unmod';
-  x.dataset.m = m;
-  x.title = 'Remover ' + m;
-  x.setAttribute('aria-label', 'Remover ' + m);
-  x.appendChild(icon('i-close'));
-  c.appendChild(x);
-  return c;
 }
 
 // Le a tela, sem filtrar: o indice de cada linha tem que continuar batendo com o
 // data-i do DOM. Quem descarta caminho vazio e o ipc, na gravacao.
 const collectRepos = () => [...$('cfgRepos').querySelectorAll('.repo')].map(row => ({
-  path: row.querySelector('.repo-input').value.trim(),
-  modules: [...row.querySelectorAll('.mchip-x')].map(b => b.dataset.m)
+  path: row.querySelector('.repo-input').value.trim()
 }));
 
 // Autosave: o rodape governa so a chave. Ninguem espera apertar Salvar numa lista de
@@ -1381,22 +1408,7 @@ function saveRepos() {
   return window.api.setRepos(cfgRepos);
 }
 
-function addMod(input, refocus) {
-  const novos = normModules(input.value);
-  input.value = '';
-  if (!novos.length) return;
-  const i = +input.closest('.repo').dataset.i;
-  cfgRepos = collectRepos();
-  // Um modulo mora num repositorio so: entrar aqui e sair de onde estava. O movimento
-  // acontece na tela inteira, que esta toda visivel — nada some sem o usuario ver.
-  cfgRepos.forEach((r, j) => { if (j !== i) r.modules = r.modules.filter(m => !novos.includes(m)); });
-  cfgRepos[i].modules = normModules([...cfgRepos[i].modules, ...novos]);
-  renderRepos();
-  saveRepos();
-  if (!refocus) return;
-  const again = $('cfgRepos').querySelector('.repo[data-i="' + i + '"] .mod-input');
-  if (again) again.focus();
-}
+
 
 // Diferente dos repositorios, aqui o espelho da tela E o estado do app: a lista pinta a
 // lista de tickets atras do dialog, entao editar e mexer em `meus` e repintar as duas.
@@ -1492,9 +1504,13 @@ $('resumoHotfix').addEventListener('click', pedirHotfix);
 $('hotfixAskNo').addEventListener('click', () => $('hotfixAsk').close());
 $('hotfixAskForm').addEventListener('submit', e => {
   e.preventDefault();
+  // Responde ANTES de fechar: o close abaixo dispara o handler que resolve com null, e
+  // responderAsk zera o pendente — quem chegar primeiro e a resposta que vale.
+  responderAsk($('hotfixAskSel').hidden ? true : $('hotfixAskRepo').value);
   $('hotfixAsk').close();
-  rodarHotfix();
 });
+// Cancelar, Esc e clique fora sao a mesma resposta: o usuario desistiu.
+$('hotfixAsk').addEventListener('close', () => responderAsk(null));
 $('claudeAskNo').addEventListener('click', () => $('claudeAsk').close());
 $('claudeAskForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -1532,7 +1548,7 @@ $('cfgKey').addEventListener('input', e => {
 
 $('cfgAddRepo').addEventListener('click', () => {
   cfgRepos = collectRepos();
-  cfgRepos.push({ path: '', modules: [] });
+  cfgRepos.push({ path: '' });
   renderRepos();
   const linhas = $('cfgRepos').querySelectorAll('.repo-input');
   linhas[linhas.length - 1].focus();
@@ -1548,11 +1564,6 @@ $('cfgRepos').addEventListener('click', async e => {
   if (b.dataset.act === 'del') {
     cfgRepos = collectRepos();
     cfgRepos.splice(i, 1);
-    renderRepos();
-    saveRepos();
-  } else if (b.dataset.act === 'unmod') {
-    cfgRepos = collectRepos();
-    cfgRepos[i].modules = cfgRepos[i].modules.filter(m => m !== b.dataset.m);
     renderRepos();
     saveRepos();
   } else if (b.dataset.act === 'pick') {
@@ -1604,17 +1615,8 @@ $('cfgStatus').addEventListener('keydown', e => {
   e.target.blur();                       // o blur dispara o change, que grava
 });
 
-$('cfgRepos').addEventListener('keydown', e => {
-  if (!e.target.classList.contains('mod-input')) return;
-  if (e.key !== 'Enter' && e.key !== ',') return;
-  e.preventDefault();                      // Enter aqui submeteria o <form method="dialog">
-  addMod(e.target, true);
-});
-
-// Sair do campo tambem confirma: escolher no datalist e sair sem Enter e o caminho comum.
 $('cfgRepos').addEventListener('change', e => {
   if (e.target.classList.contains('repo-input')) saveRepos();
-  else if (e.target.classList.contains('mod-input')) addMod(e.target, false);
 });
 
 $('tabFila').addEventListener('click', () => irPara(null));
