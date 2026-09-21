@@ -29,7 +29,9 @@ html, body {
 
 body {
   display: grid;
-  grid-template-rows: auto 1fr;   /* a faixa de abas, depois a view — a escondida sai do fluxo */
+  /* minmax(0,·): sem o 0 a linha nao desce abaixo do min-content da view, cresce alem da
+     janela e o overflow:hidden corta os tramites sem dar scroll a ninguem. */
+  grid-template-rows: auto minmax(0, 1fr);   /* a faixa de abas, depois a view — a escondida sai do fluxo */
   background: var(--bg);
   color: var(--text);
   font: 400 13.5px/1.45 var(--sans);
@@ -48,10 +50,16 @@ body {
 input { caret-color: var(--amber); }
 
 .view {
-  display: grid;
-  grid-template-rows: auto auto auto 1fr;
+  display: flex;
+  flex-direction: column;
   height: 100%;
 }
+
+/* O scroll e a unica linha elastica; as outras valem o que o conteudo pede. Com grid de
+   linhas fixas o 1fr caia na linha errada assim que a faixa de anexos ou o rodape de
+   visualizacoes aparecia, e o detalhe parava de rolar. */
+.view > * { flex: none; }
+.view > .scroll { flex: 1; min-height: 0; }
 
 /* ---------- abas ---------- */
 
