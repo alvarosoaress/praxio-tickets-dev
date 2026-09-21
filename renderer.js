@@ -31,6 +31,13 @@ let timer = null;
 let current = null;      // ticket aberto no detalhe
 let detail = null;       // { tramites, views }
 
+// Abas. A Fila e a posicao null; cada aba guarda o ticket e a UI daquele ticket — busca,
+// origem e rolagem. Os tramites nao moram aqui: quem os guarda e o detailCache, por
+// id + lastUpdate, e e ele que torna a troca de aba instantanea.
+let abas = [];
+let ativa = null;
+let arrastando = null;   // o no sendo arrastado; ver renderTabs()
+
 /* ---------- datas e envelhecimento ---------- */
 
 // O portal manda "DD/MM/YYYY HH:mm:ss" — nao e parseavel por new Date().
@@ -138,8 +145,8 @@ function ticketRow(t) {
   row.setAttribute('role', 'listitem');
   row.tabIndex = 0;
   row.dataset.age = ageBucket(min);
-  row.addEventListener('click', e => { if (!e.target.closest('a')) openDetail(t); });
-  row.addEventListener('keydown', e => { if (e.key === 'Enter') openDetail(t); });
+  row.addEventListener('click', e => { if (!e.target.closest('a')) abrirAba(t); });
+  row.addEventListener('keydown', e => { if (e.key === 'Enter') abrirAba(t); });
   row.addEventListener('contextmenu', e => { e.preventDefault(); abrirCtx(e, t); });
 
   const head = el('div', 'row-head');
@@ -234,6 +241,7 @@ function skeleton() {
 }
 
 function render() {
+  renderTabs();
   const list = $('list');
   list.textContent = '';
   $('state').hidden = true;
@@ -670,15 +678,15 @@ function cachePut(id, lastUpdate, d) {
   if (lastUpdate) detailCache.set(id, { lastUpdate, detail: d });
 }
 
-async function openDetail(t, refazer) {
+async function openDetail(t, refazer, ui) {
   const id = ticketId(t);
   current = t;
   detail = null;
   $('listView').hidden = true;
   $('detailView').hidden = false;
-  $('dq').value = '';
-  $('dOrigin').value = '';
-  $('dOrigin').dataset.active = '0';
+  $('dq').value = ui ? ui.q : '';
+  $('dOrigin').value = ui ? ui.origin : '';
+  $('dOrigin').dataset.active = $('dOrigin').value ? '1' : '0';
   $('dFilters').hidden = true;
   $('dViews').hidden = true;
   $('dAnexos').hidden = true;
@@ -698,6 +706,7 @@ async function openDetail(t, refazer) {
     detail = cache;
     $('dResumir').disabled = false;
     renderTramites();
+    if (ui) $('dScroll').scrollTop = ui.top;
     renderAnexos(anexosDe(cache.tramites));
     renderViews();
     return;
@@ -721,6 +730,7 @@ async function openDetail(t, refazer) {
   cachePut(id, t.lastUpdate, d);
   $('dResumir').disabled = false;
   renderTramites();
+  if (ui) $('dScroll').scrollTop = ui.top;
   renderAnexos(anexosDe(res.tramites));
 
   // Visualizacoes sao acessorias e entram na mesma fila do portal: so agora, com os
@@ -736,6 +746,156 @@ function closeDetail() {
   openResumo.token = null;
   $('detailView').hidden = true;
   $('listView').hidden = false;
+}
+
+/* ---------- abas ---------- */
+
+// Qual aba fica ativa depois de fechar a de indice i, numa barra com n abas. null = a Fila.
+// Fechar aba inativa nao troca de aba; fechar a ativa cai na vizinha da direita, ou na da
+// esquerda quando ela era a ultima — o mesmo que o navegador faz.
+const aposFechar = (n, ativa, i) =>
+  ativa === null ? null :
+  i > ativa ? ativa :
+  i < ativa ? ativa - 1 :
+  n === 1 ? null : Math.min(i, n - 2);
+
+// ponytail: localStorage no lugar de services/ + ipc/ com limpar() fail-closed, que e o
+// padrao do repo para estado persistido (status.json). Aqui o dado e uma lista de numeros
+// de ticket e a propria restauracao valida: numero que nao esta na fila carregada nao vira
+// aba. Se um dia o main precisar ler as abas, migra para o padrao.
+const salvarAbas = () => {
+  try { localStorage.setItem('tickets.abas', JSON.stringify({ n: abas.map(a => a.t.number), a: ativa })); } catch {}
+};
+
+// Busca, origem e rolagem vivem no DOM, nao em objeto — sair de uma aba sem passar por aqui
+// perde os tres.
+function guardarUI() {
+  if (ativa === null) return;
+  const a = abas[ativa];
+  a.q = $('dq').value;
+  a.origin = $('dOrigin').value;
+  a.top = $('dScroll').scrollTop;
+}
+
+function irPara(i) {
+  if (i === ativa) return;
+  guardarUI();
+  ativa = i;
+  if (i === null) closeDetail();
+  else openDetail(abas[i].t, false, abas[i]);
+  renderTabs();
+  salvarAbas();
+}
+
+function abrirAba(t) {
+  // A chave e o numero, nao o objeto: load() troca os objetos da fila inteira a cada
+  // refresh, e comparar por identidade abriria o mesmo ticket numa segunda aba.
+  const i = abas.findIndex(a => a.t.number === t.number);
+  if (i >= 0) return irPara(i);
+  guardarUI();
+  abas.push({ t, q: '', origin: '', top: 0 });
+  ativa = abas.length - 1;
+  openDetail(t, false, null);
+  renderTabs();
+  salvarAbas();
+}
+
+function fecharAba(i) {
+  const proxima = aposFechar(abas.length, ativa, i);
+  if (ativa !== i) guardarUI();          // a aba ativa continua na tela: o que ela tem, fica
+  abas.splice(i, 1);
+  ativa = proxima;
+  if (proxima === null) closeDetail();
+  else if (abas[proxima].t !== current) openDetail(abas[proxima].t, false, abas[proxima]);
+  renderTabs();
+  salvarAbas();
+}
+
+// So a primeira carga restaura. Numero salvo que nao esta na fila nao vira aba — e a
+// validacao inteira, e por isso nao ha limpar() aqui: lixo no localStorage nao casa nada.
+function restaurarAbas() {
+  if (restaurarAbas.feito) return;
+  restaurarAbas.feito = true;
+  let salvo = null;
+  try { salvo = JSON.parse(localStorage.getItem('tickets.abas')); } catch {}
+  if (!salvo || !Array.isArray(salvo.n)) return;
+  abas = salvo.n
+    .map(num => tickets.find(t => t.number === num))
+    .filter(Boolean)
+    .map(t => ({ t, q: '', origin: '', top: 0 }));
+  renderTabs();
+  if (Number.isInteger(salvo.a) && abas[salvo.a]) irPara(salvo.a);
+}
+
+function renderTabs() {
+  if (arrastando) return;                // repintar no meio do arrasto mataria o gesto
+  // render() e o unico gancho da barra — e ele roda a cada tecla da busca da lista e a cada
+  // minuto, pelo tick da idade. A chave corta o repintar quando nada que a aba mostra mudou.
+  const chave = ativa + '|' + abas.map(a => {
+    const meu = meuDe(a.t);
+    return [a.t.number, a.t.client, meu && meu.cor].join(':');
+  }).join(',');
+  if (renderTabs.chave === chave) return;
+  renderTabs.chave = chave;
+
+  const bar = $('tabs');
+  while (bar.children.length > 1) bar.lastElementChild.remove();
+  $('tabFila').setAttribute('aria-selected', ativa === null ? 'true' : 'false');
+
+  abas.forEach((a, i) => {
+    const b = el('div', 'tab');
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', i === ativa ? 'true' : 'false');
+    b.tabIndex = 0;
+    b.draggable = true;
+    b.dataset.n = a.t.number;
+    b.title = a.t.title || '';
+
+    // Um sinal so na aba: a marca do usuario. Envelhecimento fica na lista e no "parado ha"
+    // do detalhe — ambar numa barra sempre visivel viraria enfeite, e ambar so envelhece.
+    const meu = meuDe(a.t);
+    if (meu) {
+      const d = el('span', 'ctx-dot');
+      d.style.background = meu.cor;
+      b.appendChild(d);
+    }
+    b.append(el('span', 't-num', a.t.number), el('span', 't-n', a.t.client || '—'));
+
+    const x = el('button', 'mchip-x');
+    x.type = 'button';
+    x.title = 'Fechar (Ctrl+W)';
+    x.setAttribute('aria-label', 'Fechar aba');
+    x.appendChild(icon('i-close'));
+    x.addEventListener('click', e => { e.stopPropagation(); fecharAba(i); });
+
+    b.appendChild(x);
+    b.addEventListener('click', () => irPara(i));
+    b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); irPara(i); } });
+    b.addEventListener('auxclick', e => { if (e.button === 1) { e.preventDefault(); fecharAba(i); } });
+
+    // Reordenar arrastando. Enquanto o gesto corre, so o no do DOM se move: reconstruir a
+    // barra aqui destruiria o elemento arrastado e o arrasto morreria no meio. O array e
+    // refeito no dragend, a partir da ordem final da barra.
+    b.addEventListener('dragstart', () => { arrastando = b; });
+    b.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (!arrastando || arrastando === b) return;
+      const r = b.getBoundingClientRect();
+      bar.insertBefore(arrastando, e.clientX > r.left + r.width / 2 ? b.nextSibling : b);
+    });
+    b.addEventListener('dragend', () => {
+      arrastando = null;
+      renderTabs.chave = null;
+      const ordem = [...bar.querySelectorAll('.tab[data-n]')].map(no => no.dataset.n);
+      const numAtivo = ativa === null ? null : abas[ativa].t.number;
+      abas.sort((x, y) => ordem.indexOf(String(x.t.number)) - ordem.indexOf(String(y.t.number)));
+      if (numAtivo !== null) ativa = abas.findIndex(a => a.t.number === numAtivo);
+      renderTabs();
+      salvarAbas();
+    });
+
+    bar.appendChild(b);
+  });
 }
 
 /* ---------- resumo do ticket ---------- */
@@ -1035,10 +1195,18 @@ async function load() {
   clearNotice();
   notificar(ticketsNovos(tickets, res.tickets));
   tickets = res.tickets;
+  // Cada refresh troca os objetos da fila inteira. Sem reapontar, a aba seguraria o objeto
+  // da carga anterior com o lastUpdate congelado, e o detailCache nunca invalidaria.
+  // ponytail: a aba ativa nao e reapontada de verdade — o guarda de corrida de openDetail
+  // compara identidade de objeto, e mexer em current no meio de um fetch em voo prenderia a
+  // tela em "Carregando tramites...". O cabecalho dela so se atualiza ao sair e voltar, ou
+  // com F5. Se incomodar, o caminho e o guarda passar a comparar t.number.
+  for (const a of abas) a.t = tickets.find(x => x.number === a.t.number) || a.t;
   loadedAt = new Date();
   $('updated').textContent = 'atualizado ' + loadedAt.toLocaleTimeString('pt-BR');
   syncSelects();
   render();
+  restaurarAbas();
 }
 
 function onError(error, status) {
@@ -1313,7 +1481,7 @@ for (const id of ['fResp', 'fClient', 'fStatus']) {
   });
 }
 
-$('back').addEventListener('click', closeDetail);
+$('back').addEventListener('click', () => irPara(null));
 $('viewerClose').addEventListener('click', closeViewer);
 $('viewer').addEventListener('close', closeViewer);   // Esc nativo do <dialog>
 $('dResumir').addEventListener('click', pedirResumo);
@@ -1449,6 +1617,8 @@ $('cfgRepos').addEventListener('change', e => {
   else if (e.target.classList.contains('mod-input')) addMod(e.target, false);
 });
 
+$('tabFila').addEventListener('click', () => irPara(null));
+
 const inDetail = () => !$('detailView').hidden;
 
 document.addEventListener('keydown', e => {
@@ -1456,7 +1626,11 @@ document.addEventListener('keydown', e => {
   if ($('cfg').open || $('viewer').open || $('resumo').open || $('claudeAsk').open || $('ctx').matches(':popover-open')) return;
   if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r')) {
     e.preventDefault();
-    inDetail() ? (current && openDetail(current, true)) : load();
+    if (!inDetail()) load();
+    else if (current) {
+      if (ativa !== null) Object.assign(abas[ativa], { q: '', origin: '', top: 0 });
+      openDetail(current, true);
+    }
     return;
   }
   if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
@@ -1466,13 +1640,35 @@ document.addEventListener('keydown', e => {
     box.select();
     return;
   }
+  // Abas. A porta la de cima ja barrou dialog e menu abertos, entao um atalho daqui nunca
+  // troca de ticket deixando o visualizador ou o resumo do anterior na tela.
+  if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+    e.preventDefault();
+    if (ativa !== null) fecharAba(ativa);
+    return;
+  }
+  if (e.ctrlKey && e.key === 'Tab') {
+    e.preventDefault();
+    const n = abas.length + 1;                       // a Fila e a primeira da roda
+    const pos = (ativa === null ? 0 : ativa + 1) + (e.shiftKey ? -1 : 1);
+    const alvo = (pos + n) % n;
+    irPara(alvo === 0 ? null : alvo - 1);
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '9') {
+    e.preventDefault();
+    const i = +e.key - 1;                            // Ctrl+1 e a Fila
+    if (i === 0) irPara(null);
+    else if (abas[i - 1]) irPara(i - 1);
+    return;
+  }
   if (e.key !== 'Escape') return;
   const box = inDetail() ? $('dq') : $('q');
   if (document.activeElement === box && box.value) {   // 1o Esc limpa a busca
     box.value = '';
     inDetail() ? renderTramites() : render();
-  } else if (inDetail()) {                             // 2o Esc volta para a lista
-    closeDetail();
+  } else if (inDetail()) {                             // 2o Esc volta para a Fila, sem fechar a aba
+    irPara(null);
   }
 });
 
@@ -1489,4 +1685,4 @@ window.api.statusGet().then(b => {
 }
 
 if (typeof document !== 'undefined') wire();
-if (typeof module !== 'undefined') module.exports = { ticketsNovos, parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf, parseResumo, anexosDe, cacheGet, cachePut, showNoticeIn };
+if (typeof module !== 'undefined') module.exports = { aposFechar, ticketsNovos, parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf, parseResumo, anexosDe, cacheGet, cachePut, showNoticeIn };

@@ -112,17 +112,31 @@ não-ok todos para a mesma forma `{ error, status }`.
 4. `setInterval(load, 5 min)` e um segundo `setInterval` de 60 s que só re-renderiza para
    as idades avançarem sem bater na API.
 
-O estado é um módulo com seis variáveis no topo do `renderer.js` (`tickets`, `loadedAt`,
-`loading`, `timer`, `current`, `detail`). Não há store, não há observabilidade: `render()`
-é chamado explicitamente por quem muda algo. Com uma tela e ~4 linhas, qualquer coisa além
-disso seria cerimônia.
+O estado é um módulo com nove variáveis no topo do `renderer.js` (`tickets`, `loadedAt`,
+`loading`, `timer`, `current`, `detail`, mais `abas`, `ativa` e `arrastando`, das abas).
+Não há store, não há observabilidade: `render()` é chamado explicitamente por quem muda
+algo. Com uma tela e ~4 linhas, qualquer coisa além disso seria cerimônia.
+
+`current` e `detail` continuam sendo **o ticket na tela** — a aba ativa. As abas não são um
+segundo container de detalhe: são a lista de tickets abertos mais a UI de cada um (busca,
+origem, rolagem), e trocar de aba é rodar o mesmo `openDetail`, que acerta o cache por
+`lastUpdate` e não bate na rede. Por isso resumo, hotfix e visualizador não souberam da
+mudança.
+
+**A única exceção à regra "estado persistido passa por IPC"** são as abas abertas, que vão
+para o `localStorage` do renderer (`tickets.abas`) em vez de um arquivo no `userData`. O
+dado é uma lista de números de ticket, e a restauração casa cada número contra a fila
+recém-carregada — o que não casa é descartado, então não há validação de fronteira a fazer
+e não há o que o main precise ler. Qualquer outra coisa persistida continua indo por
+`services/` + `ipc/` com `limpar()` fail-closed.
 
 ---
 
 ## Fluxo do detalhe
 
-`openDetail(t, refazer)` (`renderer.js:570`) troca a `view` inteira — não é split nem drawer.
-A 1280 px, dividir espremeria os dois lados.
+`openDetail(t, refazer, ui)` troca a `view` inteira — não é split nem drawer. A 1280 px,
+dividir espremeria os dois lados. O terceiro parâmetro é a UI guardada da aba: em vez de
+zerar busca, origem e rolagem, semeia os três com o que aquela aba tinha.
 
 ```
 openDetail(ticket)

@@ -1,7 +1,7 @@
 // node test.js — checa o parser de data BR e o mecanismo de envelhecimento,
 // que e o sinal principal da tela. Sem framework de proposito.
 const assert = require('assert');
-const { ticketsNovos, parseBR, minutesSince, ageLabel, ageBucket, statusKey, matches, prettyXml, kindOf, anexosDe, cacheGet, cachePut, showNoticeIn } = require('./renderer.js');
+const { aposFechar, ticketsNovos, parseBR, minutesSince, ageLabel, ageBucket, statusKey, matches, prettyXml, kindOf, anexosDe, cacheGet, cachePut, showNoticeIn } = require('./renderer.js');
 const { safeHref, KEEP, NUKE, PORTAL_BASE } = require('./sanitize.js');
 const { buildPrompt, buildContent, parseResult, parseSize, escolherAnexos, lerDocs, MAX_PROMPT_CHARS, MAX_DOCS_CHARS,
         MAX_IMAGENS, MAX_PDFS, MAX_TEXTOS, MAX_ANEXOS, MAX_TEXTO_TOTAL } = require('./services/claude.js');
@@ -238,6 +238,16 @@ assert.strictEqual(cacheGet('939415', '14/09/2026 10:16:35'), null, 'cache e por
 assert.strictEqual(cacheGet('937919', null), null, 'sem lastUpdate nao ha invalidacao possivel');
 cachePut('000', null, D1);
 assert.strictEqual(cacheGet('000', null), null, 'e ticket sem lastUpdate nao entra no cache');
+
+// abas: fechar uma aba e a unica conta com ramo da barra. Errar aqui deixa o usuario numa
+// aba que nao e a que ele estava lendo, ou na Fila com abas ainda abertas.
+assert.strictEqual(aposFechar(1, 0, 0), null, 'fechar a unica aba volta para a Fila');
+assert.strictEqual(aposFechar(3, 2, 2), 1, 'fechar a ultima da direita cai na vizinha da esquerda');
+assert.strictEqual(aposFechar(3, 1, 1), 1, 'fechar a do meio cai na da direita, que herda o indice');
+assert.strictEqual(aposFechar(3, 0, 0), 0, 'fechar a primeira cai na seguinte, que vira a primeira');
+assert.strictEqual(aposFechar(3, 0, 2), 0, 'fechar aba inativa a direita nao troca de aba');
+assert.strictEqual(aposFechar(3, 2, 0), 1, 'fechar aba inativa a esquerda so desloca o indice');
+assert.strictEqual(aposFechar(3, null, 1), null, 'quem esta na Fila continua na Fila');
 
 // modulos: o usuario digita livre ("wtr, wcx") e o mesmo normalizador recebe o array vindo
 // do IPC, onde nada e confiavel. Caixa errada gravaria dois modulos para o mesmo codigo.

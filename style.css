@@ -28,6 +28,8 @@ html, body {
 }
 
 body {
+  display: grid;
+  grid-template-rows: auto 1fr;   /* a faixa de abas, depois a view — a escondida sai do fluxo */
   background: var(--bg);
   color: var(--text);
   font: 400 13.5px/1.45 var(--sans);
@@ -50,6 +52,56 @@ input { caret-color: var(--amber); }
   grid-template-rows: auto auto auto 1fr;
   height: 100%;
 }
+
+/* ---------- abas ---------- */
+
+/* A faixa e irma das duas views, nao filha: o `1fr` posicional do .view continua caindo no
+   mesmo elemento de antes. A aba ativa usa --surface, o mesmo fundo da .bar logo abaixo, e
+   se funde com a barra do ticket — e a fusao, nao um realce, que diz qual aba esta na tela. */
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 34px;
+  padding: 0 8px;
+  background: var(--bg);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar { height: 0; }
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1 1 auto;
+  min-width: 74px;
+  max-width: 220px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 5px 5px 0 0;
+  background: none;
+  color: var(--text-faint);
+  font: 400 12px/1 var(--sans);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s var(--ease), color .15s var(--ease);
+}
+
+.tab-fila { flex: none; min-width: 0; padding: 0 12px; }
+.tab svg { width: 14px; height: 14px; flex: none; }
+
+.tab:hover { color: var(--text-dim); background: var(--surface-2); }
+.tab[aria-selected="true"] { background: var(--surface); border-color: var(--line); color: var(--text); }
+
+/* Numero e dado medido: mono, tabular, e nunca cede espaco. Quem encolhe e o cliente. */
+.tab .t-num { flex: none; font: 400 11.5px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.tab .t-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tab .mchip-x { flex: none; }
+.tab .ctx-dot { margin-right: -2px; }
 
 /* ---------- barra superior ---------- */
 

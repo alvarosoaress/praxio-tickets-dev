@@ -101,17 +101,16 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
    Traduzir status HTTP para mensagem própria faz o app culpar o usuário por um problema
    que não é dele.
 
-6. **Toda alteração de UI passa pela skill `impeccable`.** Antes de editar `index.html`,
-   `style.css` ou as funções de render do `renderer.js`, invoque a skill. O mundo visual
-   não foi escolhido no improviso: o usuário optou por "Terminal de operação" entre três
-   direções apresentadas, e [`DESIGN.md`](DESIGN.md) é o contrato dessa escolha — com as
-   proibições dela. Edição avulsa faz o mundo derivar um pixel por vez até virar outra
-   coisa. A skill carrega o piso de qualidade, a profundidade de modo Operate, e é onde a
-   decisão volta documentada para o `DESIGN.md`.
+6. **UI se faz reusando o que já existe.** Antes de inventar um componente, procure o
+   equivalente já montado em `index.html`/`style.css` — linha, faixa, chip, select, botão,
+   estado vazio, modal. Editar UI com as peças e os tokens existentes é trabalho normal:
+   faça direto, respeitando [`DESIGN.md`](DESIGN.md), que é o contrato do mundo visual
+   ("Terminal de operação") e traz as proibições dele.
 
-   **Exceção:** correção que só restaura o comportamento já documentado (seletor quebrado,
-   contraste que regrediu, estado que parou de aparecer) é conserto, não design — faça
-   direto e cite a linha do `DESIGN.md` que estava sendo violada.
+   **A skill `impeccable` entra só quando um elemento de UI novo precisa existir** — algo
+   sem precedente na tela, que não dá para montar com o que já está lá. Aí o mundo visual
+   está sendo estendido, e a skill carrega o piso de qualidade e devolve a decisão
+   documentada no `DESIGN.md`.
 
 7. **Âmbar é só envelhecimento.** `--amber` não aparece em nenhum outro papel. Status usa
    azul/verde/violeta, erro usa vermelho. Se tudo vira destaque, nada é destaque.
@@ -203,6 +202,10 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | O app leva ~10 s para abrir, toda vez           | Sintoma do target `portable`, trocado por `nsis` justamente por isso: o `portable.nsi` apaga e re-extrai os ~380 MB no `%TEMP%` a cada abertura, e apaga de novo ao fechar. São dois `RMDir /r` no mesmo template — não há cache, e `unpackDirName` não muda isso. Não voltar |
 | Instalou por cima e as configurações sumiram    | Não é o instalador: config e resumos vivem em `%APPDATA%\tickets`, e ele só mexe em `%LOCALAPPDATA%\Programs\Tickets` |
 | Resumo some ao reabrir o app                    | `%APPDATA%\tickets\resumos.json` não gravou. Apagar o arquivo é seguro — só perde cache |
+| Aba sumiu depois de reabrir o app               | Ou o `localStorage` do renderer não gravou, ou o ticket saiu da fila — número que não casa com a fila carregada não vira aba (`restaurarAbas`, `renderer.js`) |
+| Cabeçalho da aba ativa não mudou depois do refresh | Esperado: `load()` reaponta as abas, menos a ativa — mexer no `current` durante um fetch em voo prenderia a tela em "Carregando trâmites…". Sair e voltar, ou `F5`, atualiza |
+| `Ctrl+W` fecha a janela em vez da aba            | Algum menu voltou ao `main.js`. `Menu.setApplicationMenu(null)` é o que deixa o atalho chegar ao renderer |
+| Abrir um ticket criou uma segunda aba dele       | O ticket veio sem `number` — é ele a chave da aba, como é a da marca de status |
 | Botão direito na linha não abre menu             | A linha precisa ser uma `.row` da lista — no detalhe não há menu. Se nem na lista abre, o ticket veio sem `number`, que é a chave da marca (`abrirCtx`, `renderer.js`) |
 | Meus status sumiram ao reabrir o app            | `%APPDATA%	ickets\status.json` não gravou. Eles salvam sozinhos a cada mudança, não no botão Salvar — que governa só a chave |
 | Marquei um ticket e a marca não apareceu        | Cor ou nome reprovados na fronteira: `ipc/status.js` só aceita `#rrggbb` e nome não-vazio, e descarta o resto em silêncio |

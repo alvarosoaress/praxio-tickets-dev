@@ -116,11 +116,56 @@ Apagar um status apaga as marcas dele na hora — deixar a linha da lista aponta
 marca que já não existe seria mostrar um dado fantasma, e renomear não solta nada, porque o
 que a marca guarda é um id interno, não o nome.
 
+## Abas
+
+**Esta seção reverte uma recusa que estava escrita aqui.** Duas vezes este documento
+dispensou aba — nas visualizações ("aba é máquina demais para dois painéis") e nos anexos
+("não é aba nem acordeão"). As duas recusas continuam de pé: elas falam de **painéis dentro
+de um ticket**, onde aba é maquinaria para esconder o que cabia na tela. O que entrou aqui é
+outra coisa — aba **entre tickets**, que é navegação, e navegação é justamente o que faltava
+memória: sem ela, voltar a um ticket que você já leu custa uma viagem à lista, toda vez.
+
+Uma faixa de 34px acima das duas views, sempre visível. A primeira aba é a **Fila** e é
+fixa: não fecha, não arrasta, e é para onde `←` e o segundo `Esc` levam. Cada ticket aberto
+vira uma aba à direita dela, arrastável, com `✕` próprio.
+
+A aba ativa usa `--surface`, o mesmo fundo da `.bar` logo abaixo, e se funde com a barra do
+ticket. **É a fusão que diz onde você está, não um realce** — a faixa fica na tela o dia
+inteiro num segundo monitor, e uma cor de destaque permanente ali viraria mobília.
+
+Rótulo: número em mono tabular, que **nunca cede espaço**, e cliente em sans que encolhe com
+reticências. Com muitas abas sobra só o número — é ele a identidade do ticket. Título vai no
+`title`, não na faixa.
+
+**Um sinal só, e é a marca do usuário**: o ponto de cor do status pessoal, o mesmo
+`.ctx-dot` do menu de contexto. Envelhecimento **não** sobe para a aba. Âmbar continua
+significando só uma coisa, e uma barra permanente com quatro números âmbares seria a regra
+morrendo de uso.
+
+Nada de novo foi desenhado: a faixa é a forma da `.anexos-strip`, a aba é o botão da
+`.viewer-tabs` das planilhas, o `✕` é o `.mchip-x` dos módulos, o ponto é o `.ctx-dot`.
+
+Sem teto de abas e sem botão "+": as abas encolhem até um piso e a faixa rola, e abrir um
+ticket é sempre pela lista — um "+" que não sabe qual ticket abrir é um botão que abre outro
+menu. Abrir da lista um ticket que já tem aba **foca a aba existente**, nunca duplica.
+
+Teclado: `Ctrl+W` fecha a ativa, `Ctrl+Tab` / `Ctrl+Shift+Tab` circulam, `Ctrl+1..9` saltam
+(`Ctrl+1` é a Fila). `Esc` volta para a Fila **sem fechar a aba** — voltar e fechar são
+coisas diferentes, e só o `✕` e o `Ctrl+W` fecham.
+
+As abas sobrevivem ao fechar o app. O que é guardado são os **números** dos tickets, e na
+volta eles só viram aba se casarem com a fila carregada: ticket que saiu da fila não volta,
+porque o app só mostra o que está em aberto.
+
 ## Tela de detalhe do ticket
 
-Substitui a lista na janela inteira (sem split e sem drawer: a 1280px qualquer divisão
-espremeria os dois lados). Volta com `←` ou `Esc`. `Esc` com busca preenchida limpa a
-busca primeiro, e só o segundo volta.
+Ocupa a janela inteira abaixo da faixa de abas (sem split e sem drawer: a 1280px qualquer
+divisão espremeria os dois lados). Volta para a Fila com `←` ou `Esc`, sem fechar a aba.
+`Esc` com busca preenchida limpa a busca primeiro, e só o segundo volta.
+
+Busca, filtro de origem e posição de rolagem são **por aba**: sair de um ticket e voltar
+devolve a tela como ela estava. Os trâmites vêm do cache por `lastUpdate` que já existia,
+então trocar de aba não bate na rede.
 
 Estrutura: barra com voltar + número + título + "parado há X" + **Resumir** + **Abrir no
 portal** — a ação que acontece dentro do app vem antes da que leva para fora;
