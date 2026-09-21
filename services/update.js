@@ -1,11 +1,12 @@
 // Atualizacao pelo GitHub. Le a ultima release publica do repo, compara com a versao
-// deste binario e, se o usuario mandar, baixa o .exe novo e o poe no lugar do atual.
+// deste binario e, se o usuario mandar, baixa o instalador novo e o roda.
 //
 // O repo e publico de proposito: sem token, sem chave, sem autenticacao nenhuma. Se um dia
 // virar privado, esta feature para de funcionar e nao ha como consertar sem embutir
 // credencial no .exe — que e exatamente o que a regra de ouro proibe.
 const { app } = require('electron');
 const { spawn } = require('child_process');
+const path = require('path');
 const fs = require('fs');
 
 const REPO = 'alvarosoaress/praxio-tickets-dev';
@@ -32,26 +33,13 @@ function maisNova(remota, local) {
   return false;
 }
 
-// O caminho do .exe ORIGINAL. O portable se extrai num diretorio temporario e roda de la,
-// entao process.execPath aponta para a copia descartavel — trocar aquilo nao atualiza nada.
-// Quem sabe o caminho de verdade e a variavel que o proprio launcher do electron-builder
-// exporta. Rodando por `npm start` ela nao existe, e nao ha .exe para trocar.
-const exePath = () => process.env.PORTABLE_EXECUTABLE_FILE || '';
-
-// Restos da troca anterior. O .old so pode morrer depois que aquele processo terminou, ou
-// seja, num boot seguinte — nunca no mesmo. Falhar aqui nao custa nada: e lixo, nao estado.
-function limparAntigo() {
-  try { fs.rmSync(exePath() + '.old', { force: true }); } catch {}
-}
-
 // Nunca lanca: { version, local, url, page } quando ha novidade, { atual: true } quando nao ha,
 // { error } quando o GitHub nao respondeu. Sem release publicada a API devolve 404, que
 // vira error e some da tela — app novo em repo sem release nao acusa nada.
 async function checar() {
-  limparAntigo();
-  // Rodando de `npm start` nao existe .exe para trocar, e quem roda do repositorio atualiza
-  // com `git pull`. Avisar ali seria um botao que nao tem o que fazer.
-  if (!exePath()) return { atual: true };
+  // Rodando de `npm start` nao ha instalacao para trocar, e quem roda do repositorio
+  // atualiza com `git pull`. Avisar ali seria um botao que nao tem o que fazer.
+  if (!app.isPackaged) return { atual: true };
   try {
     const r = await fetch(LATEST, {
       headers: { ...UA, Accept: 'application/vnd.github+json' },
@@ -78,49 +66,37 @@ async function checar() {
   }
 }
 
-// Espera o app morrer e reabre o .exe ja trocado. Precisa ser um processo de fora: quem
-// faz a troca esta prestes a sair. O `start ""` com titulo vazio e o mesmo detalhe do
-// abrirNoTerminal — sem ele o start toma o caminho entre aspas como titulo da janela.
+// Nunca lanca: { ok: true } e o app fecha para o instalador entrar, ou { error } e nada mudou.
 //
-// ponytail: espera fixa de ~3s em vez de esperar o PID sair. Se a maquina for lenta a
-// ponto de o launcher portable ainda segurar o diretorio temporario, virar loop de
-// tasklist resolve — nunca aconteceu para justificar escrever.
-function relancar(exe) {
-  const cm = spawn('cmd', ['/c', `ping -n 4 127.0.0.1 >nul & start "" "${exe}"`],
-    { detached: true, stdio: 'ignore', windowsHide: true });
-  cm.on('error', () => {});
-  cm.unref();
-}
-
-// Nunca lanca: { ok: true } e o app fecha, ou { error } e nada mudou no disco.
+// O asset do target nsis e um INSTALADOR, nao o app: trocar o .exe da pasta por ele
+// substituiria o programa pelo seu proprio setup. Entao ele e baixado e executado.
 async function aplicar(url) {
   if (!String(url || '').startsWith(DOWNLOAD_BASE)) return { error: 'Endereço de download inválido.' };
+  if (!app.isPackaged) return { error: 'Esta cópia roda do repositório — atualize com git pull.' };
 
-  const exe = exePath();
-  if (!exe) return { error: 'Esta cópia não é o .exe portátil — baixe a nova versão pelo GitHub.' };
-
-  const novo = exe + '.new', velho = exe + '.old';
+  const setup = path.join(app.getPath('temp'), 'tickets-setup.exe');
   try {
     const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(DOWNLOAD_MS) });
     if (!r.ok) return { error: `O GitHub respondeu HTTP ${r.status} ao baixar o .exe.` };
-    fs.writeFileSync(novo, Buffer.from(await r.arrayBuffer()));
-
-    // O Windows deixa RENOMEAR um .exe em uso, mas nao sobrescrever — por isso o atual sai
-    // do caminho antes de o novo entrar, em vez de o novo ser escrito por cima.
-    limparAntigo();
-    fs.renameSync(exe, velho);
-    try {
-      fs.renameSync(novo, exe);
-    } catch (e) {
-      fs.renameSync(velho, exe);   // desfaz: sair daqui sem .exe deixaria o usuario sem app
-      throw e;
-    }
+    fs.writeFileSync(setup, Buffer.from(await r.arrayBuffer()));
   } catch (e) {
-    try { fs.rmSync(novo, { force: true }); } catch {}
-    return { error: e.name === 'TimeoutError' ? 'O download demorou demais.' : `Falha ao atualizar: ${e.message}` };
+    try { fs.rmSync(setup, { force: true }); } catch {}
+    return { error: e.name === 'TimeoutError' ? 'O download demorou demais.' : `Falha ao baixar: ${e.message}` };
   }
 
-  relancar(exe);
+  // `/S` e a instalacao silenciosa do nsis; `--force-run` e o que faz o instalador reabrir
+  // o app no fim — sem ele, install silencioso termina calado e o usuario fica sem janela.
+  // O ping segura ~3s para este processo sair antes: o instalador nao sobrescreve arquivo
+  // em uso. O `start ""` com titulo vazio evita que o caminho entre aspas vire titulo.
+  //
+  // ponytail: espera fixa em vez de esperar o PID sair. Se a maquina for lenta a ponto de
+  // o instalador chegar antes, virar loop de tasklist resolve.
+  const cm = spawn('cmd', ['/c', `ping -n 4 127.0.0.1 >nul & start "" "${setup}" /S --force-run`],
+    { detached: true, stdio: 'ignore', windowsHide: true });
+  cm.on('error', () => {});
+  cm.unref();
+
+  app.quit();
   return { ok: true };
 }
 

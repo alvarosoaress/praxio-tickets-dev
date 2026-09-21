@@ -1,6 +1,6 @@
 {
   "name": "tickets",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Tickets abertos que precisam de acao do time de desenvolvimento",
   "main": "main.js",
   "scripts": {
@@ -35,7 +35,10 @@
       "oneClick": true,
       "perMachine": false
     },
-    "electronLanguages": ["pt-BR", "en-US"]
+    "electronLanguages": [
+      "pt-BR",
+      "en-US"
+    ]
   },
   "dependencies": {
     "mammoth": "^1.12.3",

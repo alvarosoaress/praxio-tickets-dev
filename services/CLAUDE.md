@@ -18,7 +18,7 @@ de IPC. Quem faz a ponte é [`../ipc/`](../ipc/CLAUDE.md).
 | `status.js`    | `status.json` no `userData` | mistura com `config.json`, pelo mesmo motivo do `resumos.js` |
 | `devlog.js`    | `dev.log` + console         | roda fora de `TICKETS_API`                               |
 | `git.js`       | o binário `git` do PATH     | importa `electron` — ver abaixo                          |
-| `update.js`    | `api.github.com` + o `.exe` portátil | escreve por cima do `.exe` que está rodando, ou baixa de fora do repo |
+| `update.js`    | `api.github.com` + o instalador nsis | escreve por cima do `.exe` que está rodando, ou baixa de fora do repo |
 
 ## As três regras
 
