@@ -1351,6 +1351,8 @@ async function openConfig() {
   if (keySaved) mascarar();
   else $('cfgKey').focus();
 
+  window.api.appVersion().then(v => { $('cfgVersion').textContent = v; });
+
   cfgRepos = res.repos || [];
   renderRepos();
   renderStatus();
@@ -1492,6 +1494,16 @@ for (const id of ['fResp', 'fClient', 'fStatus']) {
     render();
   });
 }
+
+// Clique fora fecha qualquer dialog: com padding 0 no <dialog>, so o backdrop tem o
+// proprio elemento como alvo do clique. O mousedown entra na conta porque arrastar uma
+// selecao de texto de dentro para fora solta o click no backdrop — e isso nao e desistir.
+// Fechar sempre e o caminho de cancelar: cada dialog resolve o pendente no evento 'close'.
+let downNoBackdrop = false;
+document.addEventListener('mousedown', e => { downNoBackdrop = e.target.tagName === 'DIALOG'; });
+document.addEventListener('click', e => {
+  if (downNoBackdrop && e.target.tagName === 'DIALOG') e.target.close();
+});
 
 $('back').addEventListener('click', () => irPara(null));
 $('viewerClose').addEventListener('click', closeViewer);

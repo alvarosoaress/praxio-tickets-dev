@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('api', {
   hotfixStart: (id, ticket, repoIdx) => ipcRenderer.invoke('hotfix-start', { id, ticket, repoIdx }),
   updateCheck: () => ipcRenderer.invoke('update-check'),
   updateApply: url => ipcRenderer.invoke('update-apply', url),
+  appVersion: () => ipcRenderer.invoke('app-version'),
   statusGet: () => ipcRenderer.invoke('status-get'),
   statusSet: blob => ipcRenderer.invoke('status-set', blob)
 });

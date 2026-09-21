@@ -84,15 +84,24 @@ async function aplicar(url) {
     return { error: e.name === 'TimeoutError' ? 'O download demorou demais.' : `Falha ao baixar: ${e.message}` };
   }
 
-  // `/S` e a instalacao silenciosa do nsis; `--force-run` e o que faz o instalador reabrir
-  // o app no fim — sem ele, install silencioso termina calado e o usuario fica sem janela.
+  // O instalador roda com a tela dele a mostra, e nao com `/S`: entre o clique e o app
+  // reabrir passa mais de um minuto com a janela ja fechada, e sem nada visivel nesse vao
+  // o usuario acha que travou. A barra do nsis e esse sinal, de graca. `--force-run` faz
+  // ele reabrir o app no fim.
+  //
   // O ping segura ~3s para este processo sair antes: o instalador nao sobrescreve arquivo
   // em uso. O `start ""` com titulo vazio evita que o caminho entre aspas vire titulo.
   //
   // ponytail: espera fixa em vez de esperar o PID sair. Se a maquina for lenta a ponto de
   // o instalador chegar antes, virar loop de tasklist resolve.
-  const cm = spawn('cmd', ['/c', `ping -n 4 127.0.0.1 >nul & start "" "${setup}" /S --force-run`],
-    { detached: true, stdio: 'ignore', windowsHide: true });
+  //
+  // Duas coisas medidas, nao supostas. `shell: true`: sem ele o Node escapa as aspas do
+  // comando como \", que o cmd nao desfaz — o `start` recebia caminho quebrado, abria a
+  // caixa "Windows nao encontra" e nada era instalado. `detached: true`: sem ele o cmd
+  // morre junto com o app no `quit()` abaixo, antes mesmo de o ping terminar. Por isso a
+  // janela preta aparece por ~3s — `windowsHide` nao vale para processo destacado.
+  const cm = spawn(`ping -n 4 127.0.0.1 >nul & start "" "${setup}" --force-run`,
+    { shell: true, detached: true, stdio: 'ignore' });
   cm.on('error', () => {});
   cm.unref();
 

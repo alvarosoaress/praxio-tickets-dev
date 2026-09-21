@@ -1,4 +1,4 @@
-const { ipcMain } = require('electron');
+const { ipcMain, app } = require('electron');
 const update = require('../services/update');
 
 // A URL chega de volta do renderer, que nao e confiavel — quem confere o endereco e
@@ -6,6 +6,7 @@ const update = require('../services/update');
 function register() {
   ipcMain.handle('update-check', () => update.checar());
   ipcMain.handle('update-apply', (_e, url) => update.aplicar(url));
+  ipcMain.handle('app-version', () => app.getVersion());
 }
 
 module.exports = { register };

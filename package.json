@@ -1,6 +1,6 @@
 {
   "name": "tickets",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Tickets abertos que precisam de acao do time de desenvolvimento",
   "main": "main.js",
   "scripts": {
@@ -26,6 +26,7 @@
       "services/**/*",
       "ipc/**/*",
       "style.css",
+      "build/icon.ico",
       "node_modules/**/*"
     ],
     "win": {

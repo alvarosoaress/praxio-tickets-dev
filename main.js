@@ -38,6 +38,7 @@ app.whenReady().then(() => {
   const win = new BrowserWindow({
     width: 1280, height: 800, minWidth: 720,
     backgroundColor: '#0e1116',
+    icon: path.join(__dirname, 'build', 'icon.ico'),
     webPreferences: { preload: path.join(__dirname, 'preload.js') }
   });
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
