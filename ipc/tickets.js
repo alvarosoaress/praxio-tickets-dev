@@ -4,26 +4,32 @@ const { SEARCH_MENU, get } = require('../services/portalapi');
 const numeric = id => /^\d+$/.test(String(id));
 
 function register() {
-  // A coluna "Ultimo tramite" do grid do portal atrasa — medido em producao, um ticket
-  // com tramite de hoje 09:30 vinha com lastUpdate de cinco dias atras. Como "parado ha" e
-  // o sinal primario da tela (PRODUCT.md), o valor do grid e substituido pela data do
-  // tramite mais recente, que e a unica fiel. Uma request por vez: a API serializa por
-  // sessao. Falha de um ticket nao derruba a lista — ele fica com a data do grid.
-  // ponytail: N+1 serializado. Com a fila atual (3-4 tickets) custa ~1 s por ticket; numa
-  // fila grande isso vira minutos e o certo passa a ser a API devolver a data ja corrigida.
+  // So a lista do grid, para a tela aparecer logo. A data real do "parado ha" vem depois,
+  // por 'tickets-last'.
   ipcMain.handle('tickets', async () => {
     const b = await get(`/scrape-custom/${SEARCH_MENU}`, 120_000);
-    if (b.error) return b;
-    const tickets = b.tickets || [];
-    for (const t of tickets) {
-      const id = (/\/TicketPrincipal\/(\d+)/.exec(t.link || '') || [])[1];
-      if (!id) continue;
+    return b.error ? b : { tickets: b.tickets || [] };
+  });
+
+  // A coluna "Ultimo tramite" do grid do portal atrasa — medido em producao, um ticket
+  // com tramite de hoje 09:30 vinha com lastUpdate de cinco dias atras. Como "parado ha" e
+  // o sinal primario da tela (PRODUCT.md), o renderer troca o valor do grid pela data do
+  // tramite mais recente, que e a unica fiel. A API busca todos em paralelo, uma sessao do
+  // portal por ticket; o historico inteiro vem junto (um deles tem 5,7 MB de HTML).
+  ipcMain.handle('tickets-last', async (_e, ids) => {
+    ids = (Array.isArray(ids) ? ids : []).filter(numeric);
+    if (!ids.length) return { datas: {} };
+    const b = await get(`/ultimos-tramites?ids=${ids.join(',')}`, 90_000);
+    if (b.status !== 404) return b.error ? b : { datas: b.datas || {} };
+    // ponytail: API anterior a /ultimos-tramites — um ticket por vez, como antes. Sai
+    // quando o portal-scraper novo estiver no ar.
+    const datas = {};
+    for (const id of ids) {
       const r = await get(`/tramites/${id}`, 90_000);
       // Mais recente primeiro, e `date` pode ser null quando o elemento falta no HTML.
-      const data = (r.tramites || []).find(tr => tr.date)?.date;
-      if (data) t.lastUpdate = data;
+      datas[id] = (r.tramites || []).find(tr => tr.date)?.date || null;
     }
-    return { tickets };
+    return { datas };
   });
 
   // Uma request por vez, de proposito. O portal e ASP.NET e serializa requisicoes que

@@ -106,10 +106,15 @@ não-ok todos para a mesma forma `{ error, status }`.
 
 1. `load()` (`renderer.js:763`) → canal `tickets` → `GET /scrape-custom/27662`.
 2. Sucesso: guarda em `tickets`, popula os selects a partir dos valores presentes
-   (`syncSelects`, `renderer.js:95`), renderiza.
-3. `render()` (`renderer.js:191`) filtra em memória e **ordena por tempo parado
+   (`syncSelects`, `renderer.js:95`), renderiza. O "parado há" aparece como `—` (ou com a
+   data do refresh anterior): a do grid atrasa dias.
+3. Com a lista já na tela, pede numa chamada só a data do último trâmite de todos (canal
+   `tickets-last` → `GET /ultimos-tramites?ids=`, que a API busca em paralelo). A barra de
+   progresso só apaga quando elas chegam. API anterior a essa rota (`404`): cai para um
+   `GET /tramites/:id` por ticket, em série.
+4. `render()` (`renderer.js:191`) filtra em memória e **ordena por tempo parado
    decrescente** — o mais esquecido no topo.
-4. `setInterval(load, 5 min)` e um segundo `setInterval` de 60 s que só re-renderiza para
+5. `setInterval(load, 5 min)` e um segundo `setInterval` de 60 s que só re-renderiza para
    as idades avançarem sem bater na API.
 
 O estado é um módulo com nove variáveis no topo do `renderer.js` (`tickets`, `loadedAt`,

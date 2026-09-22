@@ -1254,12 +1254,18 @@ async function load() {
   if (tickets === null) render();
 
   const res = await window.api.loadTickets();
-  setLoading(false);
-
-  if (res.error) return onError(res.error, res.status);
+  if (res.error) {
+    setLoading(false);
+    return onError(res.error, res.status);
+  }
 
   clearNotice();
   notificar(ticketsNovos(tickets, res.tickets));
+  // O lastUpdate do grid atrasa dias. Ate a data real chegar, a linha mostra a do refresh
+  // anterior ou "—", nunca a errada.
+  const antes = new Map((tickets || []).map(t => [t.number, t.lastUpdate]));
+  const grid = res.tickets.map(t => t.lastUpdate);
+  for (const t of res.tickets) t.lastUpdate = (t.number && antes.get(t.number)) || null;
   tickets = res.tickets;
   // Cada refresh troca os objetos da fila inteira. Sem reapontar, a aba seguraria o objeto
   // da carga anterior com o lastUpdate congelado, e o detailCache nunca invalidaria.
@@ -1273,6 +1279,14 @@ async function load() {
   syncSelects();
   render();
   restaurarAbas();
+
+  // A barra segue ligada ate as datas chegarem: o refresh seguinte nao comeca com elas em
+  // voo. Ticket sem data (falhou, ou veio sem id) fica com a do grid.
+  const ids = tickets.map(ticketId);
+  const { datas = {} } = await window.api.lastTramites(ids.filter(Boolean));
+  tickets.forEach((t, i) => { t.lastUpdate = datas[ids[i]] || t.lastUpdate || grid[i]; });
+  setLoading(false);
+  render();
 }
 
 function onError(error, status) {

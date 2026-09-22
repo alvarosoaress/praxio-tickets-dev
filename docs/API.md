@@ -102,7 +102,8 @@ grid DevExpress página a página, com 500 ms de espera entre elas, e devolve tu
 - **`lastUpdate` não é o último trâmite.** A coluna do grid (`scraper.js`, `childNodes[6]`)
   atrasa — medido em 16/09/2026, ticket `0926-001321` com trâmite às 09:30 do dia e
   `lastUpdate: "11/09/2026 16:44:42"`. O app descarta esse valor e usa a data do trâmite
-  mais recente de `/tramites/:id` (`ipc/tickets.js`).
+  mais recente de `/tramites/:id` via `GET /ultimos-tramites?ids=` (canal `tickets-last`, pedido pelo `load()`
+  depois que a lista já está na tela).
 - **Datas em `DD/MM/YYYY HH:mm:ss`.** `new Date()` lê isso como mês/dia. Sempre `parseBR()`.
 - **`team` vem com parênteses**: `"(N4)"`.
 - **`responsible` é o desenvolvedor**; `person` é quem abriu do lado do cliente.

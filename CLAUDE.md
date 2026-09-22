@@ -165,8 +165,9 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Campo da chave abre com bolinhas                | É máscara gerada na tela, não a chave — ela nunca chega ao renderer. `hasKey()` só diz que existe uma. Clicar no campo limpa para colar outra |
 | "Chave rejeitada pela API" com chave certa      | A API compara só os primeiros 104 chars. Espaço colado junto passa; chave curta não                                                     |
 | "A API não conseguiu buscar os tickets"         | Erro do servidor, não seu. O login da própria API no portal falhou — ver `PORTAL_LOGIN`/`PORTAL_PASSWORD` no `.env` do `portal-scraper` |
-| "Parado há" não bate com o último trâmite       | A coluna do grid do portal atrasa; `ipc/tickets.js` a substitui pela data do trâmite mais recente. Se voltou a divergir, o ticket veio sem `link`/id ou `/tramites` falhou para ele |
-| Atualizar a lista ficou mais lento              | Esperado: além do `/scrape-custom`, sai um `/tramites/:id` por ticket para achar a data real. Serializado, ~1 s por ticket |
+| "Parado há" não bate com o último trâmite       | A coluna do grid do portal atrasa; o `load()` a substitui pela data do trâmite mais recente, que chega depois da lista (`—` até lá). Se voltou a divergir, o ticket veio sem `link`/id ou `/tramites` falhou para ele |
+| "Parado há" fica em `—` e a barra não apaga    | Esperado por ~1,5 s: a lista chega em ~1,8 s e a data real vem depois, de `/ultimos-tramites` (paralelo na API). Se leva ~5 s, a API é anterior a essa rota e o app caiu para um `/tramites/:id` por ticket (`ipc/tickets.js`) |
+| O app aberto por `npm start` trava ~4 s depois da lista | O Tickets instalado está aberto e usa o mesmo perfil em `%APPDATA%	ickets`; o `localStorage` espera a trava dele. Não acontece com uma instância só |
 | Lista carrega mas a faixa de anexos não aparece | A faixa sai do `anexos` de cada trâmite (`anexosDe`), não de rota própria. Se os trâmites vieram sem `anexos`, faltou o `?anexos=1` |
 | Anexos não aparecem dentro dos trâmites         | Falta o `?anexos=1` na chamada (`ipc/tickets.js`), ou a API apontada é anterior a essa rota |
 | Trâmite editado no portal não aparece ao reabrir | Cache por `lastUpdate` (`renderer.js`). Se o portal não mexeu no `lastUpdate`, o app serve o que tinha. `F5` no detalhe ignora o cache |
