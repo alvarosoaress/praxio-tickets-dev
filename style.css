@@ -32,6 +32,10 @@ body {
   /* minmax(0,·): sem o 0 a linha nao desce abaixo do min-content da view, cresce alem da
      janela e o overflow:hidden corta os tramites sem dar scroll a ninguem. */
   grid-template-rows: auto minmax(0, 1fr);   /* a faixa de abas, depois a view — a escondida sai do fluxo */
+  /* Mesmo motivo na horizontal: a coluna implicita e `auto` e cresce ate o min-content da
+     view. Os chips da faixa de anexos nao encolhem, e com muitos anexos a view passava da
+     janela, levando junto a barra de rolagem e a contagem de tramites. */
+  grid-template-columns: minmax(0, 1fr);
   background: var(--bg);
   color: var(--text);
   font: 400 13.5px/1.45 var(--sans);
@@ -552,11 +556,14 @@ select option { background: var(--surface-2); color: var(--text); }
   gap: 7px;
   overflow-x: auto;
   padding-bottom: 2px;
-  scrollbar-width: thin;
 }
 
+/* Sem scrollbar-width aqui: no Chromium ela desliga o ::-webkit-scrollbar e volta a barra
+   nativa, branca. */
+
 .anexos-strip::-webkit-scrollbar { height: 7px; }
-.anexos-strip::-webkit-scrollbar-thumb { border-width: 2px; }
+.anexos-strip::-webkit-scrollbar-track { background: #0b0d11; }
+.anexos-strip::-webkit-scrollbar-thumb { border: 2px solid #0b0d11; }
 
 .chip {
   display: flex;
