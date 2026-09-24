@@ -1239,12 +1239,14 @@ const ticketsNovos = (prev, next) => {
   return (next || []).filter(t => !vistos.has(t.number || t.link));
 };
 
-// O som e o do toast do Windows — a tela vive num segundo monitor, o aviso precisa ser
-// audivel. Nao passa pela regra #8: isso nao e movimento na tela, e notificacao do SO.
+// A tela vive num segundo monitor, o aviso precisa ser audivel. O toast vai mudo e o som
+// toca aqui: o Windows so aceita som proprio em toast de app empacotado (MSIX), nao NSIS.
+// Nao passa pela regra #8: isso nao e movimento na tela.
 function notificar(novos) {
+  if (novos.length) new Audio('pirililim.mp3').play().catch(() => {});
   for (const t of novos) {
     new Notification('Ticket novo · ' + (t.number || '—'),
-      { body: [t.client, t.title].filter(Boolean).join(' — ') });
+      { body: [t.client, t.title].filter(Boolean).join(' — '), silent: true });
   }
 }
 

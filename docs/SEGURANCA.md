@@ -85,7 +85,7 @@ default-src 'none';
 style-src   'self' 'unsafe-inline';
 script-src  'self';
 img-src     'self' data: anexo:;
-media-src   anexo:;
+media-src   'self' anexo:;
 frame-src   anexo:;
 ```
 
@@ -95,6 +95,7 @@ frame-src   anexo:;
 | `script-src 'self'` | Só os arquivos locais. Sem `unsafe-inline`, sem `unsafe-eval`, sem CDN |
 | `style-src 'unsafe-inline'` | Concessão consciente: o zoom da imagem escreve `transform` inline. Estilo inline não executa código, e o sanitizador remove `style` de todo HTML não confiável — então conteúdo do portal não alcança essa permissão |
 | `img-src data:` | Figuras de `.docx` e o chevron dos selects |
+| `media-src 'self'` | O som da notificação de ticket novo (`pirililim.mp3`), que o toast do Windows não toca para app sem pacote |
 | `anexo:` em img/media/frame | O protocolo local. Nunca `https:` genérico |
 
 O que **não** está lá é tão importante: nenhuma origem externa, em nenhuma diretiva. O app
