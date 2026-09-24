@@ -425,7 +425,27 @@ const temDeepLink = () => new Promise(ok =>
 // aspas, nunca em `&`, e o cmd cortaria a URL no & que separa cwd de q. Aqui o SO recebe a
 // URL inteira sem passar por shell nenhum — e de quebra o `wt`, que ja quebrou esta funcao
 // uma vez reanalisando as aspas, deixa de estar no caminho.
+//
+// O handler procura o `wt` no PATH que herda DESTE processo. Sem ele, cai para um
+// `powershell` solto dentro do proprio console — e esse console morre quando o handler sai,
+// ~1,4 s depois, levando o Claude junto: o terminal so pisca. O alias `wt.exe` mora em
+// WindowsApps, que o Windows poe no PATH do usuario por padrao, mas que some com instalador
+// que regrava o PATH. Medido: mesma URL, com WindowsApps no PATH o handler abre `wt -d` e
+// a sessao fica.
+//
+// lstat e nao existsSync: o `wt.exe` de la e alias de execucao (reparse point), e o
+// existsSync segue o link e responde false para um arquivo que esta la.
+function garantirWt() {
+  if (!process.env.LOCALAPPDATA) return;
+  const dir = path.join(process.env.LOCALAPPDATA, 'Microsoft', 'WindowsApps');
+  try { fs.lstatSync(path.join(dir, 'wt.exe')); } catch { return; }
+  const partes = String(process.env.PATH || '').split(';');
+  if (partes.some(p => p.replace(/\\+$/, '').toLowerCase() === dir.toLowerCase())) return;
+  process.env.PATH = [...partes.filter(Boolean), dir].join(';');
+}
+
 function abrirNoTerminal(cwd, arquivo) {
+  garantirWt();
   // sem terminal nao ha o que fazer, e handler de IPC nao pode lancar
   shell.openExternal(deepLink(cwd, arquivo)).catch(() => {});
 }
