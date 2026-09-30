@@ -4,7 +4,7 @@ const { apiKey } = require('./config');
 
 // TICKETS_API aponta o app para uma API local durante o desenvolvimento.
 const API = process.env.TICKETS_API || 'https://portalapi.188720391.xyz';
-const SEARCH_MENU = '27662';
+const SEARCH_MENU = '29920';
 
 // Nunca lanca: sempre { ...dados } ou { error }.
 async function get(path, timeoutMs) {
