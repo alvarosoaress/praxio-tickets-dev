@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('api', {
   getRepos: () => ipcRenderer.invoke('get-repos'),
   setRepos: list => ipcRenderer.invoke('set-repos', list),
   pickDir: () => ipcRenderer.invoke('pick-dir'),
+  getListas: () => ipcRenderer.invoke('get-listas'),
+  setLista: id => ipcRenderer.invoke('set-lista', id),
   hotfixProbe: (id, ticket, repoIdx) => ipcRenderer.invoke('hotfix-probe', { id, ticket, repoIdx }),
   hotfixStart: (id, ticket, repoIdx) => ipcRenderer.invoke('hotfix-start', { id, ticket, repoIdx }),
   updateCheck: () => ipcRenderer.invoke('update-check'),

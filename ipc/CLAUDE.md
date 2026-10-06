@@ -5,7 +5,7 @@ A fronteira com o renderer. Um arquivo por domínio, cada um exportando `registe
 
 | Arquivo      | Canais                                          |
 | ------------ | ----------------------------------------------- |
-| `config.js`  | `has-key`, `set-key`, `claude-ok`, `claude-allow`, `get-repos`, `set-repos`, `pick-dir` |
+| `config.js`  | `has-key`, `set-key`, `claude-ok`, `claude-allow`, `get-repos`, `set-repos`, `get-listas`, `set-lista`, `pick-dir` |
 | `tickets.js` | `tickets`, `ticket-detail`, `ticket-views`       |
 | `anexos.js`  | `anexo-text`, `anexo-html` + `registerProtocol()` |
 | `resumo.js`  | `resumo`                                         |

@@ -27,6 +27,7 @@ const icon = (name, cls) => {
 let tickets = null;      // null = nunca carregou
 let loadedAt = null;
 let loading = false;
+let geracao = 0;         // sobe a cada troca de listagem; load() descarta resposta de geracao velha
 let timer = null;
 let current = null;      // ticket aberto no detalhe
 let detail = null;       // { tramites, views }
@@ -1254,8 +1255,10 @@ async function load() {
   if (loading) return;
   setLoading(true);
   if (tickets === null) render();
+  const g = geracao;
 
   const res = await window.api.loadTickets();
+  if (g !== geracao) { setLoading(false); return load(); }
   if (res.error) {
     setLoading(false);
     return onError(res.error, res.status);
@@ -1286,6 +1289,7 @@ async function load() {
   // voo. Ticket sem data (falhou, ou veio sem id) fica com a do grid.
   const ids = tickets.map(ticketId);
   const { datas = {} } = await window.api.lastTramites(ids.filter(Boolean));
+  if (g !== geracao) { setLoading(false); return load(); }
   tickets.forEach((t, i) => { t.lastUpdate = datas[ids[i]] || t.lastUpdate || grid[i]; });
   setLoading(false);
   render();
@@ -1360,7 +1364,11 @@ async function openConfig() {
   $('cfgSave').textContent = 'Salvar e carregar';
   if (!dlg.open) dlg.showModal();
 
-  const [temChave, res] = await Promise.all([window.api.hasKey(), window.api.getRepos()]);
+  const [temChave, res, ls] = await Promise.all([window.api.hasKey(), window.api.getRepos(), window.api.getListas()]);
+  const sel = $('cfgLista');
+  sel.textContent = '';
+  for (const l of ls.listas) sel.appendChild(new Option(l.nome, l.id));
+  sel.value = ls.atual;
   keySaved = temChave;
   // Com chave gravada nao ha nada a fazer neste campo, entao ele nao rouba o foco; sem
   // ela, colar a chave e a unica tarefa da tela.
@@ -1641,6 +1649,18 @@ $('cfgStatus').addEventListener('keydown', e => {
   if (e.key !== 'Enter' || !e.target.classList.contains('st-nome')) return;
   e.preventDefault();                    // Enter aqui submeteria o <form method="dialog">
   e.target.blur();                       // o blur dispara o change, que grava
+});
+
+// Troca na hora. tickets = null faz a primeira carga da lista nova contar como primeira:
+// sem isso, todo ticket dela notificaria como "novo". Um load em voo ve a geracao mudar e
+// recomeca sozinho.
+$('cfgLista').addEventListener('change', async e => {
+  const r = await window.api.setLista(e.target.value);
+  if (r.error) return;
+  geracao++;
+  tickets = null;
+  render();
+  load();
 });
 
 $('cfgRepos').addEventListener('change', e => {

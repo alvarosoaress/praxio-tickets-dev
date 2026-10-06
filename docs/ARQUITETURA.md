@@ -104,7 +104,7 @@ não-ok todos para a mesma forma `{ error, status }`.
 
 ## Fluxo da lista
 
-1. `load()` (`renderer.js:763`) → canal `tickets` → `GET /scrape-custom/27662`.
+1. `load()` (`renderer.js:763`) → canal `tickets` → `GET /scrape-custom/<id>`, com o id da listagem escolhida.
 2. Sucesso: guarda em `tickets`, popula os selects a partir dos valores presentes
    (`syncSelects`, `renderer.js:95`), renderiza. O "parado há" aparece como `—` (ou com a
    data do refresh anterior): a do grid atrasa dias.
@@ -275,4 +275,4 @@ do próprio `Esc`.
   coluna exigiria comparar datas, e hoje só a idade é convertida.
 - **Sem paginação.** A API devolve o conjunto inteiro; a UI renderiza tudo. Com centenas de
   tickets isso vira um DOM grande de uma vez.
-- **`customSearchMenu` fixo em `27662`** (`services/portalapi.js`). Trocar de fila é editar o código.
+- **As listagens são uma lista fixa** (`LISTAS`, `services/portalapi.js`). O usuário escolhe entre elas; incluir uma nova é editar o código.

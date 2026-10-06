@@ -33,4 +33,8 @@ const setClaudeOk = () => writeCfg({ ...readCfg(), claudeOk: CONSENT_V });
 const repos = () => { const r = readCfg().repos; return Array.isArray(r) ? r : []; };
 const setRepos = list => writeCfg({ ...readCfg(), repos: list });
 
-module.exports = { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos };
+// Id da listagem escolhida. Quem confere contra LISTAS e ipc/config.js.
+const lista = () => readCfg().lista;
+const setLista = id => writeCfg({ ...readCfg(), lista: id });
+
+module.exports = { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos, lista, setLista };

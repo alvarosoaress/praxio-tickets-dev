@@ -1,5 +1,6 @@
 const { ipcMain } = require('electron');
-const { SEARCH_MENU, get } = require('../services/portalapi');
+const { LISTAS, get } = require('../services/portalapi');
+const { lista } = require('../services/config');
 
 const numeric = id => /^\d+$/.test(String(id));
 
@@ -7,7 +8,8 @@ function register() {
   // So a lista do grid, para a tela aparecer logo. A data real do "parado ha" vem depois,
   // por 'tickets-last'.
   ipcMain.handle('tickets', async () => {
-    const b = await get(`/scrape-custom/${SEARCH_MENU}`, 120_000);
+    const id = (LISTAS.find(l => l.id === lista()) || LISTAS[0]).id;
+    const b = await get(`/scrape-custom/${id}`, 120_000);
     return b.error ? b : { tickets: b.tickets || [] };
   });
 

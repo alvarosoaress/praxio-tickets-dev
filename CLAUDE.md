@@ -218,6 +218,7 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Meus status somem ao reabrir o app              | `%APPDATA%	ickets\status.json` não gravou. Eles salvam sozinhos a cada mudança, não no botão Salvar — que governa só a chave |
 | Marquei um ticket e a marca não apareceu        | Nome ou cor reprovados na fronteira: `ipc/status.js` só aceita `#rrggbb` e nome não-vazio, e descarta o resto em silêncio |
 | O status que apaguei levou as marcas junto      | Esperado: marca para status inexistente não é gravada (`limpar`, `ipc/status.js`). Renomear não solta nada — a marca guarda o id, não o nome |
+| Listagem nova não aparece em Configurações      | Ela só existe se estiver em `LISTAS` (`services/portalapi.js`). Id gravado que saiu de lá cai na primeira da lista, sem aviso |
 | Um status não aparece no filtro de meus status  | Só entram os que estão marcados em algum ticket da fila — mesma regra dos outros três selects |
 
 ---
@@ -264,7 +265,7 @@ silêncio.
 
 | Termo                | Significado                                                                                                             |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **customSearchMenu** | Busca salva criada à mão na GUI do portal; o id sai da requisição do browser. `27662` = fila do time de desenvolvimento |
+| **customSearchMenu** | Busca salva criada à mão na GUI do portal; o id sai da requisição do browser. As opções ficam em `LISTAS` (`services/portalapi.js`); o usuário escolhe em Configurações → Listagem |
 | **trâmite**          | Uma mensagem no histórico do ticket. Tem origem (operador/cliente/privado), autor, data e o status daquele momento      |
 | **visualização**     | Registro de quem abriu o ticket no portal e quando                                                                      |
 | **parado há X**      | Tempo corrido desde o **trâmite mais recente**. É o sinal primário da tela, não o status                                |

@@ -13,8 +13,8 @@ atribuídos ao time de desenvolvimento da Praxio.
 é **há quanto tempo o ticket está parado** (`lastUpdate`) — não o status, não o cliente.
 
 **Verdades do produto.**
-- Fonte única: `GET https://portalapi.188720391.xyz/scrape-custom/27662` (busca salva do
-  portal Praxio). Header `Authorization` com chave crua de 104 chars, sem `Bearer`.
+- Fonte única: `GET https://portalapi.188720391.xyz/scrape-custom/<id>` (busca salva do
+  portal Praxio, escolhida em Configurações → Listagem). Header `Authorization` com chave crua de 104 chars, sem `Bearer`.
 - A chamada leva ~3,5s e não tem cache; devolve o conjunto inteiro, sem paginação.
 - Campos exibíveis já chegam como string pronta. Datas em `DD/MM/YYYY HH:mm:ss`.
 - `responsible` é o desenvolvedor; `person` é quem abriu do lado do cliente.

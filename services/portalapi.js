@@ -4,7 +4,13 @@ const { apiKey } = require('./config');
 
 // TICKETS_API aponta o app para uma API local durante o desenvolvimento.
 const API = process.env.TICKETS_API || 'https://portalapi.188720391.xyz';
-const SEARCH_MENU = '29920';
+// Listagens que o usuario pode escolher em Configuracoes. O id e o customSearchMenu, uma
+// busca salva criada na GUI do portal (o id sai da requisicao do browser). A primeira e o
+// padrao, e e para onde cai um id gravado que saiu desta lista.
+const LISTAS = [
+  { id: '29920', nome: 'TICKETS - SIGA' },
+  { id: '29865', nome: 'TICKETS - PRAXIO' },
+];
 
 // Nunca lanca: sempre { ...dados } ou { error }.
 async function get(path, timeoutMs) {
@@ -64,4 +70,4 @@ async function anexoStream(id) {
   }
 }
 
-module.exports = { SEARCH_MENU, get, anexoBytes, anexoStream };
+module.exports = { LISTAS, get, anexoBytes, anexoStream };

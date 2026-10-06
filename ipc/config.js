@@ -1,5 +1,6 @@
 const { ipcMain, dialog, BrowserWindow } = require('electron');
-const { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos } = require('../services/config');
+const { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos, lista, setLista } = require('../services/config');
+const { LISTAS } = require('../services/portalapi');
 
 const MAX_REPOS = 20;
 const MAX_PATH = 400;
@@ -48,6 +49,18 @@ function register() {
     if (!limpo) return { error: 'Lista de repositórios inválida.' };
     setRepos(limpo);
     return { ok: true, repos: limpo };
+  });
+
+  ipcMain.handle('get-listas', () => ({
+    listas: LISTAS,
+    atual: (LISTAS.find(l => l.id === lista()) || LISTAS[0]).id
+  }));
+
+  // Allowlist: o id vira path na URL da API, entao so passa o que esta em LISTAS.
+  ipcMain.handle('set-lista', (_e, id) => {
+    if (!LISTAS.some(l => l.id === id)) return { error: 'Listagem inválida.' };
+    setLista(id);
+    return { ok: true };
   });
 
   // Seletor nativo de pasta. Nao valida nada e nao e fronteira: quem confere e set-repos,

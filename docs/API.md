@@ -32,7 +32,7 @@ A chave vive em `%APPDATA%\tickets\config.json` e não aparece em nenhum arquivo
 
 | Método | Rota | Uso | Tempo típico |
 | --- | --- | --- | --- |
-| `GET` | `/scrape-custom/27662` | a fila inteira | ~3,5 s |
+| `GET` | `/scrape-custom/:customSearchMenuId` | a fila inteira | ~3,5 s |
 | `GET` | `/tramites/:ticketId?anexos=1` | histórico do ticket + anexos por trâmite | ~0,5–2,2 s |
 | `GET` | `/visualizacoes/:ticketId` | quem leu o ticket | ~0,5 s |
 | `GET` | `/anexos/:ticketId` | todos os anexos do ticket | ~0,6 s — **o app não usa mais** |
