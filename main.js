@@ -7,7 +7,7 @@ const ipcConfig = require('./ipc/config');
 const ipcTickets = require('./ipc/tickets');
 const ipcAnexos = require('./ipc/anexos');
 const ipcResumo = require('./ipc/resumo');
-const ipcHotfix = require('./ipc/hotfix');
+const ipcAnalise = require('./ipc/analise');
 const ipcUpdate = require('./ipc/update');
 const ipcStatus = require('./ipc/status');
 const { attachDevLog } = require('./services/devlog');
@@ -24,7 +24,7 @@ ipcConfig.register();
 ipcTickets.register();
 ipcAnexos.register();
 ipcResumo.register();
-ipcHotfix.register();
+ipcAnalise.register();
 ipcUpdate.register();
 ipcStatus.register();
 

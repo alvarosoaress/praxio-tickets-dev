@@ -4,7 +4,7 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { app, shell } = require('electron');
-const { deepLink } = require('./git');
+const { deepLink } = require('./briefing');
 
 const MODEL = 'sonnet';
 const TIMEOUT_MS = 180_000;
@@ -409,15 +409,15 @@ function resumir(ticket, tramites, anexos, repo) {
 
 // O mesmo CLI em modo interativo, mas o app nao manda nada: o deep link abre uma janela de
 // terminal no repositorio com a frase JA DIGITADA na caixa e parada ali — quem aperta Enter
-// e o usuario, depois de ler e editar. A URL e montada em services/git.js; aqui so se abre.
+// e o usuario, depois de ler e editar. A URL e montada em services/briefing.js; aqui so se abre.
 //
 // O cwd aponta PARA o repo, ao contrario do resumir(): este e justamente o caso em que
 // descobrir o CLAUDE.md e ler o codigo e o objetivo.
 
 // O handler `claude-cli://` so existe depois que a maquina rodou `claude` interativo e
 // ENVIOU um prompt — abrir e sair nao registra. Sem ele o link nao faz nada visivel, entao
-// ipc/hotfix.js pergunta isto ANTES de criar branch nenhuma: falhar depois deixaria o
-// usuario numa branch nova sem entender o que aconteceu.
+// ipc/analise.js pergunta isto ANTES de escrever o .md: falhar depois deixaria o
+// arquivo largado no repositorio sem terminal nenhum.
 const temDeepLink = () => new Promise(ok =>
   execFile('reg', ['query', 'HKCU\\Software\\Classes\\claude-cli'], { windowsHide: true }, e => ok(!e)));
 

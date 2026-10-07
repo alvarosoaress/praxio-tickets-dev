@@ -9,7 +9,7 @@ A fronteira com o renderer. Um arquivo por domínio, cada um exportando `registe
 | `tickets.js` | `tickets`, `ticket-detail`, `ticket-views`       |
 | `anexos.js`  | `anexo-text`, `anexo-html` + `registerProtocol()` |
 | `resumo.js`  | `resumo`                                         |
-| `hotfix.js`  | `hotfix-probe`, `hotfix-start`                    |
+| `analise.js` | `analise`                                        |
 | `update.js`  | `update-check`, `update-apply`                   |
 | `status.js`  | `status-get`, `status-set`                        |
 
@@ -26,7 +26,7 @@ tem que acontecer **antes** do ready. Separar os dois não é estilo, é ordem o
    do handler, antes de qualquer chamada. O `services/` confia em quem chama.
 
    `set-repos` descarta linha sem caminho **antes** de gravar, e não depois: a ordem da
-   lista é o contrato com `hotfix.js` e `resumo.js`, que recebem do renderer o índice de
+   lista é o contrato com `analise.js` e `resumo.js`, que recebem do renderer o índice de
    uma linha dela.
 
 3. **Erro da API sai verbatim.** `/scrape-custom` devolve `401 "Falha no login"` quando o
@@ -49,24 +49,21 @@ Os quatro status padrão saem daqui, e só enquanto o arquivo **nunca foi gravad
 é "existe a chave `defs`", não "a lista tem item". Apagar todos é escolha do usuário; um
 default que ressuscita sozinho não é default.
 
-## `hotfix.js`
+## `analise.js`
 
-Dois canais porque há uma pergunta no meio: `hotfix-probe` só lê (gitflow instalado? repo
-inicializado? workspace sujo?), a tela decide, e `hotfix-start` executa. O `start` **reroda
-os mesmos checks** — o renderer não é confiável, e o usuário tem esse repositório aberto
-noutra janela o dia inteiro.
+Um canal só: escreve `TICKET-<n>.md` na raiz do repositório e abre o Claude nele. Nenhum
+comando git — sem branch, sem stash, então não há pergunta no meio.
 
 O renderer manda `{ id, ticket, repoIdx }` e **nunca um caminho**: `repoIdx` é o índice de
 uma linha de `config.repos`, e quem lê o caminho é este lado. O usuário aponta qual das
 opções que já viu; o main decide o que ela significa. Mesmo espírito da regra de ouro #9.
 
-`NO_DEEPLINK` vem **antes** do probe, de propósito: sem o handler `claude-cli://` registrado
-a hotfix não teria como abrir nada no fim, e descobrir isso depois deixaria o usuário numa
-branch nova sem entender o que aconteceu.
+`NO_DEEPLINK` vem **antes** de escrever o `.md`, de propósito: sem o handler `claude-cli://`
+registrado nada abriria, e o arquivo ficaria largado no repositório.
 
-Cada impedimento tem código próprio (`NO_REPO`, `NO_DEEPLINK`, `NO_GITFLOW`,
-`NO_GITFLOW_INIT`, `NO_DIR`, `NO_GIT`, `NO_RESUMO`, `NO_SLUG`) porque o conserto de cada um
-é diferente. Erro do git no meio da sequência não vira código: sai verbatim, com o `step` e o nome do stash junto.
+Cada impedimento tem código próprio (`NO_RESUMO`, `NO_SLUG`, `NO_REPO`, `NO_DIR`,
+`NO_DEEPLINK`) porque o conserto de cada um é diferente. Falha ao escrever o arquivo não
+vira código: sai verbatim.
 
 ## `resumo.js`
 
@@ -81,7 +78,7 @@ Dois motivos para ele existir separado de `services/claude.js`:
   'NO_CONSENT' }` e não chama nada. O conteúdo do ticket sai da máquina; o usuário
   autoriza uma vez — e o aceite é versionado, porque ele descreve **o que** sai
   (`CONSENT_V`, hoje 3).
-- **O repositório.** Mesmo `repoIdx` da hotfix: o renderer aponta uma linha de
+- **O repositório.** Mesmo `repoIdx` da análise: o renderer aponta uma linha de
   `config.repos`, nunca um caminho. `services/claude.js` só recebe o caminho pronto e lê
   dali os `.md` da raiz, que entram no prompt como contexto do sistema.
 

@@ -12,10 +12,10 @@ const MAX_PATH = 400;
 //
 // Existencia da pasta NAO e checada de proposito: o repo pode estar num drive offline ou
 // ainda nao clonado, e reprovar a lista toda por uma linha faria o autosave perder as
-// linhas boas. Quem descobre que o caminho nao presta e o probe da hotfix, na hora, com
+// linhas boas. Quem descobre que o caminho nao presta e a analise, na hora, com
 // mensagem propria para cada caso.
 //
-// A ordem da lista e o contrato: ipc/hotfix.js e ipc/resumo.js recebem do renderer o
+// A ordem da lista e o contrato: ipc/analise.js e ipc/resumo.js recebem do renderer o
 // indice de uma linha daqui. Por isso linha descartada some antes de gravar, e nao depois.
 function limpar(list) {
   if (!Array.isArray(list)) return null;

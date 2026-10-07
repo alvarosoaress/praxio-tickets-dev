@@ -17,7 +17,7 @@ de IPC. Quem faz a ponte é [`../ipc/`](../ipc/CLAUDE.md).
 | `resumos.js`   | `resumos.json` no `userData` | mistura com `config.json` — ver abaixo                   |
 | `status.js`    | `status.json` no `userData` | mistura com `config.json`, pelo mesmo motivo do `resumos.js` |
 | `devlog.js`    | `dev.log` + console         | roda fora de `TICKETS_API`                               |
-| `git.js`       | o binário `git` do PATH     | importa `electron` — ver abaixo                          |
+| `briefing.js`  | o `.md` na raiz do repo + `.git/info/exclude` | importa `electron` — ver abaixo        |
 | `update.js`    | `api.github.com` + o instalador nsis | escreve por cima do `.exe` que está rodando, ou baixa de fora do repo |
 
 ## As três regras
@@ -32,9 +32,9 @@ de IPC. Quem faz a ponte é [`../ipc/`](../ipc/CLAUDE.md).
    quem checa o consentimento do usuário é `ipc/resumo.js`. É isso que deixa `buildPrompt`
    e `parseResult` testáveis em `node test.js`, sem subir Electron.
 
-## Por que `git.js` não importa `electron`
+## Por que `briefing.js` não importa `electron`
 
-É o único. `slugTicket` — a allowlist que separa o portal da linha de comando —,
+É o único. `slugTicket` — a allowlist que separa o portal do nome de arquivo e da URL —,
 `buildBriefing` e `deepLink` são puros, e o `test.js` precisa importá-los sem subir
 Electron.
 
@@ -42,17 +42,10 @@ Electron.
 o que ele monta depende do nome de arquivo que o `slugTicket` acima torna seguro, e a
 fronteira e o que a atravessa ficam melhor no mesmo arquivo.
 
-Três coisas medidas, não supostas: `git flow version` responde 0 até **fora** de um
-repositório, então ele só diz que o gitflow está instalado — quem diz que o repo foi
-inicializado é `gitflow.branch.develop`, e sem esse check o `hotfix start` para num prompt
-interativo e trava o main. E o gitflow AVH **não** diz "already exists" quando já há uma
-hotfix aberta: diz "There is an existing hotfix branch" (`jaExiste()`). E o `hotfix start`
-exige a branch de **produção** igual à origin, não só a develop — por isso, depois do
-`pull` da develop, vem um `git fetch origin <master>:<master>`, que adianta a produção sem
-trocar de branch e sem forçar. Falhar ali não interrompe: quem decide se pode começar
-continua sendo o gitflow, que dá a mensagem certa.
+Nenhum comando git roda. O exclude só é escrito quando `.git` na raiz é **pasta**; worktree
+(`.git` arquivo) ou pasta fora de git ficam sem ele, e o `.md` só aparece no `git status`.
 
-## Como o `claude` da hotfix abre
+## Como o `claude` da análise abre
 
 Não abre por `spawn`. `abrirNoTerminal` (`claude.js`) chama `shell.openExternal` com uma
 URL `claude-cli://open?cwd=…&q=…`, e o Windows entrega ao handler que o Claude Code
@@ -75,8 +68,8 @@ O que isso trouxe junto:
   (`[erro 0x80070002 ao iniciar ""cmd /k claude … Leia" …]`).
 - **O handler pode não existir.** Ele só é registrado depois que a máquina rodou `claude`
   interativo e **enviou** um prompt; abrir e sair não registra. `temDeepLink()` lê
-  `HKCU\Software\Classes\claude-cli`, e `ipc/hotfix.js` chama isso **antes** do probe —
-  falhar depois deixaria o usuário numa branch nova sem terminal e sem explicação.
+  `HKCU\Software\Classes\claude-cli`, e `ipc/analise.js` chama isso **antes** de escrever
+  o `.md` — falhar depois deixaria o arquivo largado no repositório sem terminal nenhum.
 
 ## Por que `resumos.js` e `status.js` não usam o `config.json`
 

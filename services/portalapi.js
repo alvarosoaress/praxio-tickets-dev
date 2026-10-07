@@ -9,7 +9,8 @@ const API = process.env.TICKETS_API || 'https://portalapi.188720391.xyz';
 // padrao, e e para onde cai um id gravado que saiu desta lista.
 const LISTAS = [
   { id: '29920', nome: 'TICKETS - SIGA' },
-  { id: '29865', nome: 'TICKETS - PRAXIO' },
+  { id: '29865', nome: 'TICKETS - PRAXIO MG' },
+  // { id: '28660', nome: 'ATENDIMENTO - PRAXIO MG' },
 ];
 
 // Nunca lanca: sempre { ...dados } ou { error }.

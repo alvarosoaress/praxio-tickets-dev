@@ -55,9 +55,9 @@ arquivo único, a doc dela mora em `docs/`.
 | Arquivo       | Papel                                                                                                          |
 | ------------- | -------------------------------------------------------------------------------------------------------------- |
 | `main.js`     | Só o arquivo principal: registra o scheme, liga os módulos de IPC, abre a janela. ~40 linhas                   |
-| `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`, `git`, `update`, `status`, `status`  |
-| `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`, `hotfix`, `update`, `status`, `status`             |
-| `preload.js`  | Ponte `contextBridge`. 15 funções, nada além disso                                                             |
+| `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`, `briefing`, `update`, `status`  |
+| `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`, `analise`, `update`, `status`             |
+| `preload.js`  | Ponte `contextBridge`. 14 funções, nada além disso                                                             |
 | `renderer.js` | Toda a UI: lista, detalhe, filtros, visualizador de anexo, estados de erro                                     |
 | `sanitize.js` | Allowlist de HTML. Fronteira de confiança — ver regra #2                                                       |
 | `index.html`  | Markup + biblioteca de ícones SVG inline + CSP                                                                 |
@@ -138,18 +138,18 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
     cobre dado novo. Pela mesma régua, `CONSENT_V` subiu para **3** quando o resumo passou a
     levar junto os `.md` da raiz do repositório do módulo (`lerDocs`, `services/claude.js`):
     até ali só saía conteúdo de ticket, agora sai documentação interna do código. Só `.md`,
-    só a raiz, e código-fonte nunca. A hotfix também escreve
+    só a raiz, e código-fonte nunca. A Análise também escreve
     o resumo num `.md` dentro do repo e o entrega ao `claude` — e só existe onde já há
-    resumo, ou seja, onde `claudeOk` já foi dado. `ipc/hotfix.js` confere de novo na
+    resumo, ou seja, onde `claudeOk` já foi dado. `ipc/analise.js` confere de novo na
     fronteira: sem resumo em cache, `NO_RESUMO` e nada acontece. O resumo entrega
     título, cliente e o texto dos trâmites ao `claude` do PATH. Sem `claudeOk` no
     `config.json`, `ipc/resumo.js` devolve `NO_CONSENT` e **nada é enviado**. O aceite é
     pedido uma vez, com o que sai escrito por extenso — não numa nota de rodapé.
 
 14. **Nada vindo do portal entra numa linha de comando.** O único campo que atravessa é o
-    número do ticket, filtrado por allowlist em `slugTicket()` (`services/git.js`), e ele
-    vira nome de branch, nome de arquivo e argumento do terminal. Título, cliente e resumo
-    vão **dentro** do `.md`. Todo comando git usa `execFile` com array de args, sem shell.
+    número do ticket, filtrado por allowlist em `slugTicket()` (`services/briefing.js`), e
+    ele vira nome de arquivo e parte da URL `claude-cli://` que abre o terminal. Título,
+    cliente e resumo vão **dentro** do `.md`.
 
 15. **Dependência nova precisa de justificativa escrita.** Hoje são duas, ambas porque
     converter `.xlsx`/`.docx` à mão não é viável. Spinner, toast, date-lib e afins não
@@ -189,17 +189,12 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Botão Resumir fica desabilitado                 | Ele só libera quando os trâmites chegam — é o que ele manda para o Claude (`openDetail`) |
 | Resumo não atualiza depois de um trâmite novo   | Esperado: o cache não se refaz sozinho. A faixa âmbar avisa e "Refazer" atualiza |
 | Repositórios somem ao reabrir o app             | `config.json` não gravou. Eles salvam sozinhos a cada mudança, não no botão Salvar — que governa só a chave |
-| "Nenhum repositório apontado"                    | Configurações → Repositórios está vazio. A lista é `config.repos`, e Resumir e Hotfix perguntam qual usar |
-| "git flow não está instalado"                    | O `git-flow` não está no PATH **do processo Electron**. Instalar e reabrir o app |
-| "Este repositório não usa git flow"              | Falta `git flow init` no repo. `git flow version` passa mesmo assim — são dois checks diferentes (`services/git.js`) |
-| Hotfix trava sem responder                      | Seria o `hotfix start` num repo sem `git flow init`, esperando resposta num prompt sem TTY. O check de `gitflow.branch.develop` existe para isso |
-| "Branches 'master' and 'origin/master' have diverged" | A hotfix nasce da produção, e o gitflow a quer igual à origin. O app adianta ela sozinho (`git fetch origin <master>:<master>`, `services/git.js`); se a mensagem persistir é divergência de verdade — há commit local na produção que a origin não tem, e isso não dá para resolver automaticamente |
-| "O Claude ainda não se registrou nesta máquina" | O app abre o Claude por `claude-cli://`, e o Windows só conhece esse link depois que a máquina rodou `claude` interativo e **enviou** um prompt — abrir e sair não registra. `temDeepLink()` confere antes de criar branch nenhuma |
-| Clicar Hotfix não abre terminal nenhum          | O link do sistema recusa caminho de rede, UNC e `..`. Um repositório em `\\servidor\dev` não abre, e o app não descobre isso antes — aponte uma pasta local |
-| Hotfix abre o terminal e ele fecha na hora, sem erro | O handler do `claude-cli://` não achou o `wt` no PATH e caiu para um `powershell` preso ao console dele, que morre junto quando o handler sai. O alias `wt.exe` mora em `%LOCALAPPDATA%\Microsoft\WindowsApps`; `garantirWt()` (`services/claude.js`) o põe no PATH antes do link. Se voltar, confira se o Windows Terminal está instalado |
+| "Nenhum repositório apontado"                    | Configurações → Repositórios está vazio. A lista é `config.repos`, e Resumir e Análise perguntam qual usar |
+| "O Claude ainda não se registrou nesta máquina" | O app abre o Claude por `claude-cli://`, e o Windows só conhece esse link depois que a máquina rodou `claude` interativo e **enviou** um prompt — abrir e sair não registra. `temDeepLink()` confere antes de escrever o `.md` |
+| Clicar Análise não abre terminal nenhum         | O link do sistema recusa caminho de rede, UNC e `..`. Um repositório em `\\servidor\dev` não abre, e o app não descobre isso antes — aponte uma pasta local |
+| Análise abre o terminal e ele fecha na hora, sem erro | O handler do `claude-cli://` não achou o `wt` no PATH e caiu para um `powershell` preso ao console dele, que morre junto quando o handler sai. O alias `wt.exe` mora em `%LOCALAPPDATA%\Microsoft\WindowsApps`; `garantirWt()` (`services/claude.js`) o põe no PATH antes do link. Se voltar, confira se o Windows Terminal está instalado |
 | Nada é enviado ao Claude quando o terminal abre | Esperado: o link **preenche** a caixa e para. Ler, editar e apertar Enter é do usuário — é a única coisa que sai daqui para o modelo nesse passo |
-| Minhas alterações sumiram depois da hotfix      | Estão no stash, com o número do ticket na mensagem. `git stash list` → `git stash pop` |
-| `TICKET-<n>.md` aparece no `git status`         | O append no `.git/info/exclude` falhou. É só ruído — o arquivo pode ser apagado |
+| `TICKET-<n>.md` aparece no `git status`         | O append no `.git/info/exclude` falhou, ou o `.git` da raiz não é pasta (worktree). É só ruído — o arquivo pode ser apagado |
 | A faixa de "versão nova" nunca aparece          | Ou o app roda de `npm start` — sem instalação para trocar, `checar()` sai em `{ atual: true }` —, ou a tag da release não é maior que a `version` do `package.json`. Tag igual à versão instalada não notifica. O que a atualização roda é o **instalador** da release, com `/S --force-run`: o `.exe` da pasta nunca é sobrescrito à mão |
 | O app leva ~10 s para abrir, toda vez           | Sintoma do target `portable`, trocado por `nsis` justamente por isso: o `portable.nsi` apaga e re-extrai os ~380 MB no `%TEMP%` a cada abertura, e apaga de novo ao fechar. São dois `RMDir /r` no mesmo template — não há cache, e `unpackDirName` não muda isso. Não voltar |
 | Instalou por cima e as configurações sumiram    | Não é o instalador: config e resumos vivem em `%APPDATA%\tickets`, e ele só mexe em `%LOCALAPPDATA%\Programs\Tickets` |

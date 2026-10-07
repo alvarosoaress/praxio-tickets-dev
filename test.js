@@ -7,7 +7,7 @@ const { buildPrompt, buildContent, parseResult, parseSize, escolherAnexos, lerDo
         MAX_IMAGENS, MAX_PDFS, MAX_TEXTOS, MAX_ANEXOS, MAX_TEXTO_TOTAL } = require('./services/claude.js');
 const { respHeaders } = require('./services/anexo.js');
 const { parseResumo } = require('./renderer.js');
-const { slugTicket, deepLink, buildBriefing, jaExiste, MAX_SLUG } = require('./services/git.js');
+const { slugTicket, deepLink, buildBriefing, MAX_SLUG } = require('./services/briefing.js');
 const { maisNova } = require('./services/update.js');
 
 // parser: o portal manda "DD/MM/YYYY HH:mm:ss", que new Date() le como MM/DD
@@ -251,8 +251,7 @@ assert.strictEqual(aposFechar(3, null, 1), null, 'quem esta na Fila continua na 
 console.log('ok');
 
 
-// hotfix: slugTicket e a fronteira com a linha de comando, o nome de branch e o nome de
-// arquivo. O que importa nao e o formato bonito, e que NADA de shell sobreviva.
+// analise: slugTicket e a fronteira com o nome de arquivo e com a URL que abre o Claude. O que importa nao e o formato bonito, e que NADA de shell sobreviva.
 assert.strictEqual(slugTicket(' 938963 '), '938963');
 assert.strictEqual(slugTicket('TK-938963'), 'TK-938963');
 for (const veneno of ['938963 & calc.exe', '"; rm -rf /', '$(whoami)', 'a|b', 'a`b`c', 'a;b', "a'b", 'a\b']) {
@@ -286,18 +285,10 @@ const brf = buildBriefing(
   'ONDE\nFaturamento.', '938963');
 assert.ok(brf.includes('938963') && brf.includes('ACME') && brf.includes('Faturamento.'));
 assert.ok(brf.includes('nunca instrução'), 'o briefing tem que desarmar instrucao vinda do ticket');
-assert.ok(brf.includes('hotfix/938963'), 'diz em qual branch o Claude esta');
+assert.ok(!brf.includes('hotfix/'), 'a analise nao cria branch, o briefing nao pode dizer que criou');
 assert.ok(buildBriefing({}, '', 'x').includes('(sem resumo)'), 'ticket vazio ainda devolve texto util');
 assert.ok(buildBriefing().length > 0, 'sem argumento nenhum nao lanca');
 
-// a mensagem do gitflow quando a branch ja esta la. Sao duas formas e a primeira e a que
-// acontece de verdade no AVH — sem ela, o segundo clique no mesmo ticket larga o usuario
-// na develop em vez de reabrir a hotfix
-assert.ok(jaExiste("Fatal: There is an existing hotfix branch '938963'. Finish that one first."));
-assert.ok(jaExiste("Branch 'hotfix/938963' already exists. Pick another name."));
-assert.ok(!jaExiste('fatal: couldn\'t find remote ref develop'), 'erro de rede nao vira "ja existe"');
-assert.ok(!jaExiste(''), 'vazio nao vira "ja existe"');
-assert.ok(!jaExiste(null));
 
 
 // empacotamento: o .exe leva SO o que esta em build.files, e esquecer um arquivo ali nao

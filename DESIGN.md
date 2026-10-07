@@ -440,107 +440,80 @@ O botão de confirmação usa `.btn-primary`, que **deixou de ser âmbar** nesta
 mundo quase preto, um neutro claro já é hierarquia suficiente, e a cor com significado
 volta a ter um significado só. O "Salvar e carregar" da chave da API herdou o conserto.
 
-## Hotfix a partir do resumo
+## Análise a partir do resumo
 
-Um segundo botão na barra do `#resumo` leva de "entendi o ticket" a "estou na branch, com a
-pergunta pronta": pergunta em qual repositório, cria `hotfix/<número>` nele, escreve um
-briefing com o resumo dentro da branch e abre um terminal com o `claude` — **com a frase já
-digitada na caixa e não enviada**.
+Um segundo botão na barra do `#resumo` leva de "entendi o ticket" a "o Claude está no
+código, com a pergunta pronta": pergunta em qual repositório, escreve um briefing com o
+resumo na raiz dele e abre um terminal com o `claude` — **com a frase já digitada na caixa e
+não enviada**. Nenhum comando git roda: o Claude abre na branch em que o repositório já
+estava.
 
 **Mora na barra do resumo, não na do detalhe.** A ação só existe quando existe resumo — é
 ele que vira o briefing. Na barra do resumo isso é estrutural: o botão está onde a
 pré-condição já foi satisfeita, e não precisa de estado próprio para saber se pode
-aparecer. Na barra do detalhe ele teria que nascer desabilitado e consultar o cache para
-descobrir se libera, o que é mais máquina para dizer a mesma coisa.
+aparecer.
 
 **Depois de "Refazer"**, pela mesma regra da barra do detalhe: a ação que acontece dentro do
-app vem antes da que sai dele. Refazer mexe no texto que você está lendo; Hotfix abre uma
+app vem antes da que sai dele. Refazer mexe no texto que você está lendo; Análise abre uma
 janela fora do app e escreve em disco.
 
-**O ícone `#i-branch` tem duas bolas, não três.** A versão canônica do símbolo de branch usa
-três nós, e os ícones da barra renderizam a 14px — é a mesma medida que descartou a
-engrenagem em Configurações. Duas bolas e um arco sobrevivem ao tamanho; o terceiro nó vira
-mancha. Traço 1.6, a folha inteira.
+**O ícone `#i-claude` é a estrela do Claude em traço.** Raios de comprimento desigual, como
+na marca, mas sem preenchimento e sem a cor dela: traço 1.6, `currentColor`, a mesma folha
+dos outros ícones. A laranja da marca seria uma terceira cor de destaque disputando com o
+âmbar — regra de ouro #7.
 
 **O último passo é do usuário, não do app.** O terminal abre com a pergunta escrita e o
 cursor esperando: dá para acrescentar contexto, corrigir o rumo ou desistir antes que
-qualquer coisa saia daqui. O app enviava essa frase sozinho, e o que isso tirava não era um
-clique — era a única chance de corrigir a pergunta antes de ela custar uma resposta inteira.
+qualquer coisa saia daqui.
 
-**Sucesso não tem faixa.** O terminal abrindo é a confirmação — é uma janela nova na tela,
-não há o que anunciar depois disso. Uma faixa de sucesso exigiria um variante verde do
-`.notice`, cujo default neste app é âmbar, e âmbar aqui significa envelhecimento e nada
-mais. O dialog do resumo fecha e o trabalho continua no terminal.
+**Sucesso não tem faixa.** O terminal abrindo é a confirmação. Uma faixa de sucesso exigiria
+um variante verde do `.notice`, cujo default neste app é âmbar, e âmbar aqui significa
+envelhecimento e nada mais. O dialog do resumo fecha e o trabalho continua no terminal.
 
 ### A pergunta do repositório
 
-**Um `<select>` no `#hotfixAsk`, não uma tela nova.** O dialog já era o lugar de "antes de
-começar, isto" — escolher, confirmar o stash e explicar o que impediu são o mesmo instante,
-e três telas para ele seriam três lugares para procurar a mesma resposta. O controle é o
+**Um `<select>` no `#analiseAsk`, não uma tela nova.** O dialog é o lugar de "antes de
+começar, isto" — escolher e explicar o que impediu são o mesmo instante. O controle é o
 `.sel` dos filtros da lista, só que ocupando a largura do dialog: os 180px de lá cortariam
-justamente o fim do caminho, que é o que distingue um repositório do outro.
+justamente o fim do caminho, que é o que distingue um repositório do outro. A largura de
+470px cabe um caminho como `C:\dev\praxio\Autumn.SIGAi` em mono 12px.
 
 **Resumir pergunta também, e oferece "Sem repositório".** Lá a doc do repositório é
-precisão a mais — sem ela o resumo diz "módulo de estoque" em vez do nome da unit, mas sai.
-A hotfix não tem esse caminho: sem repositório não há onde criar a branch. E a pergunta só
-aparece quando o resumo vai mesmo ser gerado; reabrir um resumo em cache não pergunta nada,
-porque ali o clique não decidiria coisa alguma.
-
-### Dois lugares para dizer que deu errado, e eles não são intercambiáveis
-
-**O que impede de começar vai para o `#hotfixAsk`**: gitflow ausente, repositório sem
-`git flow init`, nenhum repositório apontado, caminho que não existe, e o link do Claude
-ainda não registrado nesta máquina. São situações em que nada aconteceu ainda e cada uma
-tem um conserto diferente — "aponte um repositório" e
-"rode `git flow init`" não se parecem. Um dialog dá espaço para nomear o problema e o
-caminho de volta; uma faixa de uma linha, não.
-
-**O que quebra no meio vai para a faixa `.notice[data-kind="down"]`** do próprio resumo, a
-mesma do "não foi possível refazer". Aí já rodou alguma coisa: pode haver um stash, e o
-resumo continua valendo atrás da faixa. Tirar isso da tela para mostrar um dialog seria a
-mesma perda que a regra de ouro #4 evita na lista.
-
-**Quando existe stash, a mensagem de erro diz o nome dele.** Um erro que não cita o stash
-faz o usuário achar que perdeu o trabalho — e ele acabou de ver um aviso dizendo que tudo
-seria guardado. O texto traz o nome e o `git stash pop`.
-
-### O aviso do stash
-
-Workspace com alterações abre o `#hotfixAsk` antes de qualquer comando: quantos arquivos,
-em qual branch, para qual branch vai, e o caminho do repositório em mono — caminho é dado
-medido, mesmo registro das linhas de Configurações. **Workspace limpo não pergunta nada**:
-não há o que guardar, então não há decisão a tomar, e um dialog de confirmação sem
-consequência é só um clique a mais.
+precisão a mais. A análise não tem esse caminho: sem repositório não há onde escrever o
+briefing nem onde abrir o Claude.
 
 **O botão de saída muda de nome conforme o que ele faz** — "Cancelar" quando há uma ação
-pendente, "Fechar" quando o dialog é só informação. É a mesma decisão que transformou o
-"Cancelar" de Configurações em "Fechar" quando o rodapé deixou de governar a lista.
+pendente, "Fechar" quando o dialog é só informação. Mesma decisão de Configurações.
 
-O dialog **não fecha o resumo atrás dele**: os dois ficam empilhados, e o texto que motivou
-a hotfix continua visível enquanto você decide. Reusa `dialog`, `.dlg-body` e `.dlg-foot`,
-e a largura de 470px já foi calculada para caber um caminho como
-`C:\dev\praxio\Autumn.SIGAi` em mono 12px.
+### Dois lugares para dizer que deu errado
+
+**O que impede de começar vai para o `#analiseAsk`**: nenhum repositório apontado, caminho
+que não existe, e o link do Claude ainda não registrado nesta máquina. Nada aconteceu ainda e
+cada um tem um conserto diferente; um dialog dá espaço para nomear o problema e o caminho de
+volta.
+
+**Falha ao escrever o briefing vai para a faixa `.notice[data-kind="down"]`** do próprio
+resumo, a mesma do "não foi possível refazer". O resumo continua valendo atrás da faixa —
+tirá-lo da tela seria a mesma perda que a regra de ouro #4 evita na lista.
 
 ### O briefing é a fronteira, não a linha de comando
 
-O `.md` que entra na branch carrega título, cliente e o texto do resumo. **Nada disso passa
-pela linha de comando**: só o número do ticket, filtrado por allowlist
-(`slugTicket`, `services/git.js`), vira nome de branch, nome de arquivo e parte da URL que
-abre o Claude. É a mesma postura fail-closed do `sanitize.js`, aplicada a uma fronteira
-nova.
+O `.md` carrega título, cliente e o texto do resumo. **Nada disso passa pela URL**: só o
+número do ticket, filtrado por allowlist (`slugTicket`, `services/briefing.js`), vira nome
+de arquivo e parte da URL que abre o Claude. É a mesma postura fail-closed do `sanitize.js`.
 
 O briefing também avisa o Claude, por extenso, de que o texto do ticket é **material para
 diagnóstico e nunca instrução** — o mesmo risco de injeção que o prompt de sistema do resumo
 já trata, agora que o texto vira um arquivo entregue a um agente com ferramentas.
 
 O arquivo entra no `.git/info/exclude`, não no `.gitignore`: o briefing é do app e do
-momento, e o `.gitignore` é versionado e pertence ao time. A branch nasce e permanece limpa.
+momento, e o `.gitignore` é versionado e pertence ao time.
 
 ## Atualização pelo GitHub
 
 Quando existe uma release mais nova que este `.exe`, uma faixa aparece no topo da lista com
 um botão que baixa a versão nova, troca o binário no lugar e reabre o app. A checagem
-acontece uma vez por abertura, e **sem novidade a tela não muda** — nada de "você está
+acontece ao abrir e a cada clique em Atualizar (não no refresh automático), e **sem novidade a tela não muda** — nada de "você está
 atualizado", que é um aviso que ninguém pediu ocupando o topo da tela o dia inteiro.
 
 **Reusa a faixa `.notice` da lista: nenhum markup novo, nenhuma regra de CSS nova.** O nó já
@@ -552,7 +525,7 @@ saber, sem te impedir de trabalhar".
 vendo é velho". Um app atrás da release é literalmente o mesmo formato: existe algo mais novo
 do que o que está na sua frente. O que continua proibido é âmbar como ênfase — "importante",
 "novo", "clique aqui". Inventar um variante verde ou azul para esta faixa estava fora de
-questão pelo mesmo motivo que o sucesso da hotfix não tem faixa: são dois variantes, e cada
+questão pelo mesmo motivo que o sucesso da análise não tem faixa: são dois variantes, e cada
 cor a mais apaga a que já significava alguma coisa.
 
 **A faixa é um nó só e três avisos a disputam** — erro de refresh, erro da atualização e
@@ -576,7 +549,7 @@ topo é governada pelo fetch da lista, que continua rodando a cada 60s por baixo
 disputariam o mesmo nó. Se um dia a troca falhar por rede lenta a ponto de alguém matar o
 app achando que travou, é aí que a porcentagem se paga.
 
-**Sucesso não tem faixa**, pela mesma razão do terminal da hotfix: o app fechar e reabrir na
+**Sucesso não tem faixa**, pela mesma razão do terminal da análise: o app fechar e reabrir na
 versão nova é a confirmação. A falha vai para o variante vermelho com "Tentar de novo",
 porque nada foi trocado no disco e a lista atrás continua válida — a mesma divisão da regra
 de ouro #4.

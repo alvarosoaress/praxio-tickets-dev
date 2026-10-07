@@ -68,7 +68,7 @@ function register() {
     // Id de anexo continua validado do lado de la (anexoBytes), e so entra aqui anexo que
     // veio dos proprios tramites — o renderer nunca escolhe qual arquivo sai da maquina.
     const { anexos } = escolherAnexos(tramites);
-    // Indice da lista salva, como na hotfix: o renderer aponta uma opcao que ja viu, nunca
+    // Indice da lista salva, como na analise: o renderer aponta uma opcao que ja viu, nunca
     // um caminho. -1 (ou indice que nao existe) e "seguir sem repositorio" — o resumo sai
     // como sempre saiu, porque a doc e precisao a mais e nao pre-requisito.
     const repo = repos()[Number(repoIdx)];

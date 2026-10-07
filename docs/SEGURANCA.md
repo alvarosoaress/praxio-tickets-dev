@@ -15,7 +15,7 @@
 | Cliente → API | `ticketId`, `anexoId` | Validação numérica nos dois lados |
 | Disco | A chave de 104 caracteres | `config.json` no `userData` |
 | **App → Anthropic** | **Texto do ticket e os `.md` da raiz do repo do módulo, no resumo** | **Gate de consentimento em `ipc/resumo.js`** |
-| **App → linha de comando** | **Número do ticket, no nome de branch e de arquivo** | **Allowlist em `slugTicket()` (`services/git.js`)** |
+| **App → deep link do Claude** | **Número do ticket, no nome de arquivo e na URL** | **Allowlist em `slugTicket()` (`services/briefing.js`)** |
 | Config → `style` inline | A cor do status pessoal | `#rrggbb` obrigatório em `limpar()` (`ipc/status.js`) |
 
 ---

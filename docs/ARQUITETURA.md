@@ -37,7 +37,7 @@ ligado.
 
 ## Contrato do IPC
 
-Dezenove canais, todos definidos em `preload.js` e implementados em [`ipc/`](../ipc/CLAUDE.md).
+Dezoito canais, todos definidos em `preload.js` e implementados em [`ipc/`](../ipc/CLAUDE.md).
 
 | Canal | Entrada | Saída | Onde |
 | --- | --- | --- | --- |
@@ -54,8 +54,7 @@ Dezenove canais, todos definidos em `preload.js` e implementados em [`ipc/`](../
 | `anexo-text` | `anexoId` | `{ text }` ou `{ error }` | `ipc/anexos.js` |
 | `anexo-html` | `{ id, kind }` | `{ sheets }` ou `{ error }` | `ipc/anexos.js` |
 | `resumo` | `{ id, ticket, tramites, refazer }` | `{ text, cached? }` ou `{ error }` | `ipc/resumo.js` |
-| `hotfix-probe` | `{ id, ticket }` | `{ ok, … }` ou `{ error }` | `ipc/hotfix.js` |
-| `hotfix-start` | `{ id, ticket }` | `{ ok, branch, stash? }` ou `{ error }` | `ipc/hotfix.js` |
+| `analise` | `{ id, ticket, repoIdx }` | `{ ok }` ou `{ error }` | `ipc/analise.js` |
 | `update-check` | — | `{ atual }` ou `{ versao, url }` | `ipc/update.js` |
 | `update-apply` | `url` | `{ ok }` ou `{ error }` | `ipc/update.js` |
 | `status-get` | — | `{ defs, por }` | `ipc/status.js` |
@@ -70,7 +69,7 @@ módulo de IPC e abre a janela. Abaixo dele, duas camadas com direção de depen
 ```
 main.js
   ├─ ipc/        fronteira com o renderer: valida entrada, monta { dados } | { error }
-  └─ services/   adaptadores do mundo externo: config, portalapi, anexo, claude, devlog, git, update, status
+  └─ services/   adaptadores do mundo externo: config, portalapi, anexo, claude, devlog, briefing, update, status
 ```
 
 Duas ordens são obrigatórias e não são estilo: `registerSchemesAsPrivileged` fica em
@@ -125,7 +124,7 @@ algo. Com uma tela e ~4 linhas, qualquer coisa além disso seria cerimônia.
 `current` e `detail` continuam sendo **o ticket na tela** — a aba ativa. As abas não são um
 segundo container de detalhe: são a lista de tickets abertos mais a UI de cada um (busca,
 origem, rolagem), e trocar de aba é rodar o mesmo `openDetail`, que acerta o cache por
-`lastUpdate` e não bate na rede. Por isso resumo, hotfix e visualizador não souberam da
+`lastUpdate` e não bate na rede. Por isso resumo, análise e visualizador não souberam da
 mudança.
 
 **A única exceção à regra "estado persistido passa por IPC"** são as abas abertas, que vão
@@ -179,44 +178,26 @@ objeto cacheado mesmo que o usuário já tenha voltado para a lista.
 
 ---
 
-## Fluxo da hotfix
+## Fluxo da análise
 
-Sai do `#resumo` e termina num terminal fora do app. Duas chamadas, porque há uma pergunta
-no meio.
+Sai do `#resumo` e termina num terminal fora do app. Uma chamada só: nada no repositório
+muda além de um arquivo, então não há o que confirmar no meio.
 
-1. `pedirHotfix()` (`renderer.js`) pergunta em qual repositório salvo trabalhar e manda o
-   **índice** da escolha no canal `hotfix-probe`, junto de `{ id, ticket }`.
-2. `ipc/hotfix.js` lê o caminho em `config.repos[repoIdx]`. **O renderer nunca manda
-   caminho** — mesmo espírito da regra de ouro #9. Antes de qualquer leitura de disco,
-   `temDeepLink()` confere que o handler `claude-cli://` existe nesta máquina: sem ele o
-   passo 6 não abriria nada, e a branch já teria sido criada.
-3. `git.probe()` roda quatro comandos de leitura, nesta ordem:
-   `git flow version` (instalado?) → `git rev-parse --absolute-git-dir` (é repo?) →
-   `git config --get gitflow.branch.develop` (inicializado?) → `git status --porcelain`.
-4. Impedimento volta como código (`NO_GITFLOW`, `NO_REPO`, `NO_DEEPLINK`, …) e abre o
-   `#hotfixAsk` — o mesmo dialog que acabou de fazer a pergunta do repositório.
-   Workspace sujo volta como `dirty: N` e abre o mesmo dialog, agora com confirmação.
-   Workspace limpo pula o dialog e vai direto para o passo 5.
-5. Canal `hotfix-start`, que **reroda os mesmos checks** e então executa:
-   `git add -A` + `git stash push -m …` (se sujo) → `git checkout <develop>` →
-   `git pull --ff-only` → `git flow hotfix start <slug>`.
-6. Escreve `TICKET-<slug>.md` no repo, acrescenta o nome ao `.git/info/exclude`, e chama
-   `abrirNoTerminal()` (`services/claude.js`): um `shell.openExternal` na URL
-   `claude-cli://open?cwd=…&q=…` que `deepLink()` (`services/git.js`) montou. O Windows
-   abre o terminal, e o Claude sobe **com a frase na caixa e não enviada** — quem aperta
-   Enter é o usuário.
+1. `pedirAnalise()` (`renderer.js`) pergunta em qual repositório salvo trabalhar e manda o
+   **índice** da escolha no canal `analise`, junto de `{ id, ticket }`.
+2. `ipc/analise.js` lê o caminho em `config.repos[repoIdx]`. **O renderer nunca manda
+   caminho** — mesmo espírito da regra de ouro #9. Confere resumo em cache, número do
+   ticket, pasta existente e, antes de escrever qualquer coisa, `temDeepLink()`: sem o
+   handler `claude-cli://` o passo 3 não abriria nada e o `.md` ficaria largado.
+3. Impedimento volta como código (`NO_RESUMO`, `NO_SLUG`, `NO_REPO`, `NO_DIR`,
+   `NO_DEEPLINK`) e abre o `#analiseAsk` — o mesmo dialog que fez a pergunta do repositório.
+4. Escreve `TICKET-<slug>.md` na raiz do repo, acrescenta o nome ao `.git/info/exclude`
+   (quando `.git` é pasta), e chama `abrirNoTerminal()` (`services/claude.js`): um
+   `shell.openExternal` na URL `claude-cli://open?cwd=…&q=…` que `deepLink()`
+   (`services/briefing.js`) montou. O Claude sobe **com a frase na caixa e não enviada** —
+   quem aperta Enter é o usuário.
 
-### As três decisões que custaram medição
-
-- **`git flow version` responde 0 fora de um repositório.** Ele só prova instalação. O que
-  prova inicialização é `gitflow.branch.develop` — e sem esse check o `hotfix start` para
-  num prompt interativo que, sem TTY, trava o processo main até o timeout de 60s.
-- **O stash vem antes do `checkout`.** Checkout com tree sujo ou falha, ou carrega as
-  mudanças para a develop. Por isso todo erro a partir daí devolve o nome do stash: depois
-  que ele existe, um erro que não o cita faz o usuário achar que perdeu o trabalho.
-- **O gitflow AVH não diz "already exists"** quando já há uma hotfix aberta, e sim "There is
-  an existing hotfix branch" — ele só admite uma por vez. `jaExiste()` cobre as duas formas;
-  sem isso, o segundo clique no mesmo ticket falha e larga o usuário na develop.
+Nenhum comando git roda: o Claude abre na branch em que o repositório já estava.
 
 ## Estados da UI
 

@@ -939,8 +939,8 @@ function setResumindo(on) {
   $('resumoRedo').disabled = on;
   $('dResumir').disabled = on;
   $('dResumirLabel').textContent = on ? 'Resumindo…' : 'Resumir';
-  // A hotfix leva o texto do resumo junto; enquanto ele nao existe nao ha o que levar.
-  if (on) $('resumoHotfix').disabled = true;
+  // A analise leva o texto do resumo junto; enquanto ele nao existe nao ha o que levar.
+  if (on) $('resumoAnalise').disabled = true;
 }
 
 // Pede o aceite antes de qualquer chamada: o conteudo do ticket sai da maquina.
@@ -984,7 +984,7 @@ async function openResumo(refazer) {
     // Desistir de um Refazer nao pode apagar o resumo que ja estava na tela — mesma regra
     // do refresh da lista. Sem texto anterior nao ha o que segurar, entao fecha.
     if (idx === null) {
-      if (tinhaTexto) $('resumoHotfix').disabled = false;
+      if (tinhaTexto) $('resumoAnalise').disabled = false;
       else closeResumo();
       return;
     }
@@ -1003,7 +1003,7 @@ async function openResumo(refazer) {
   if (res.error) {
     if (tinhaTexto) {
       showNoticeIn('resumoNotice', 'down', 'Não foi possível refazer: ' + res.error + ' O resumo abaixo é o anterior.');
-      $('resumoHotfix').disabled = false;   // o resumo anterior continua valendo como briefing
+      $('resumoAnalise').disabled = false;   // o resumo anterior continua valendo como briefing
       return;
     }
     $('resumoBody').hidden = true;
@@ -1012,7 +1012,7 @@ async function openResumo(refazer) {
   }
 
   paintResumo(parseResumo(res.text));
-  $('resumoHotfix').disabled = false;
+  $('resumoAnalise').disabled = false;
   // Só o carimbo: o numero do ticket ja esta na barra do detalhe, logo acima.
   $('resumoMeta').textContent = res.at ? 'resumido em ' + fmtQuando(res.at) : '';
   // Desatualizado nao se conserta sozinho: a chamada custa, entao quem decide e o usuario.
@@ -1034,44 +1034,37 @@ function closeResumo() {
   setResumindo(false);
   $('resumoNotice').hidden = true;
   $('resumoBody').textContent = '';   // senao o proximo ticket abre com o resumo do anterior
-  $('resumoHotfix').disabled = true;
+  $('resumoAnalise').disabled = true;
   $('resumo').close();
 }
 
-/* ---------- hotfix a partir do resumo ---------- */
+/* ---------- analise a partir do resumo ---------- */
 
-// Codigos que o main devolve quando a hotfix nem chegou a comecar. Erro de git no meio da
-// sequencia nao esta aqui de proposito: ele vem como texto do proprio git e vai para a
-// faixa, nao para um dialog.
-const HOTFIX_CODIGOS = new Set(['NO_RESUMO', 'NO_SLUG', 'NO_REPO', 'NO_DEEPLINK', 'NO_DIR', 'NO_GIT', 'NO_GITFLOW', 'NO_GITFLOW_INIT']);
+// Codigos que o main devolve quando a analise nem chegou a comecar. Erro de disco ao
+// escrever o .md nao esta aqui de proposito: ele vem como texto e vai para a faixa.
+const ANALISE_CODIGOS = new Set(['NO_RESUMO', 'NO_SLUG', 'NO_REPO', 'NO_DEEPLINK', 'NO_DIR']);
 
-// Cada um destes tem um conserto diferente. Um "não foi possível criar a hotfix" para todos
+// Cada um destes tem um conserto diferente. Um "não foi possível abrir a análise" para todos
 // faria o usuario adivinhar qual — a mesma razao da regra de ouro #5.
-function hotfixErro(res) {
+function analiseErro(res) {
   switch (res.error) {
     case 'NO_RESUMO': return ['Sem resumo para levar',
-      'A hotfix entrega o resumo do ticket ao Claude, e este ticket ainda não tem um. Gere o resumo primeiro.'];
+      'A análise entrega o resumo do ticket ao Claude, e este ticket ainda não tem um. Gere o resumo primeiro.'];
     case 'NO_SLUG': return ['Ticket sem número utilizável',
-      'O portal não devolveu para este ticket um número que sirva de nome de branch.'];
+      'O portal não devolveu para este ticket um número que sirva de nome de arquivo.'];
     case 'NO_REPO': return ['Nenhum repositório apontado',
-      'Abra Configurações → Repositórios e aponte a pasta local onde a hotfix deve nascer.'];
+      'Abra Configurações → Repositórios e aponte a pasta local onde o Claude deve abrir.'];
     case 'NO_DEEPLINK': return ['O Claude ainda não se registrou nesta máquina',
       'O app abre o Claude por um link do sistema, e esse link só passa a existir depois que você roda "claude" num terminal e envia um prompt. Faça isso uma vez e tente de novo.'];
     case 'NO_DIR': return ['A pasta do repositório não existe',
       'O caminho apontado em Configurações não está acessível: drive desconectado, ou o repositório ainda não foi clonado.', res.repo];
-    case 'NO_GIT': return ['Isso não é um repositório git',
-      'A pasta existe, mas não tem um .git dentro. Confira o caminho em Configurações.', res.repo];
-    case 'NO_GITFLOW': return ['git flow não está instalado',
-      'O comando não respondeu nesta máquina. Ele precisa estar no PATH do processo do Tickets, não só no seu terminal — depois de instalar, reabra o app.'];
-    case 'NO_GITFLOW_INIT': return ['Este repositório não usa git flow',
-      'Falta rodar "git flow init" nele. Sem isso o comando pararia numa pergunta que ninguém pode responder daqui, então o app cancela antes de travar.', res.repo];
-    default: return ['Não foi possível criar a hotfix', res.error];
+    default: return ['Não foi possível abrir a análise', res.error];
   }
 }
 
-// Um dialog para os quatro momentos que cercam a hotfix: escolher o repositorio, avisar do
-// stash, e explicar o que impediu. Quatro telas para o mesmo instante ("antes de comecar,
-// isto") seriam quatro lugares para procurar a mesma resposta.
+// Um dialog para os momentos que cercam a analise: escolher o repositorio e explicar o que
+// impediu. Duas telas para o mesmo instante ("antes de comecar, isto") seriam dois lugares
+// para procurar a mesma resposta.
 //
 // Devolve uma promessa: o valor do select no confirmar, `true` quando nao ha select, e
 // null quando o usuario desiste — Cancelar, Esc ou clique fora dao no mesmo. Assim quem
@@ -1079,62 +1072,62 @@ function hotfixErro(res) {
 //
 // O rotulo do botao de sair muda com o que ele faz: ha o que cancelar quando existe uma
 // acao pendente, e so o que fechar quando o dialog e informacao. Mesma decisao do #cfg.
-let hotfixAskResp = null;
-const responderAsk = v => { const r = hotfixAskResp; hotfixAskResp = null; if (r) r(v); };
+let analiseAskResp = null;
+const responderAsk = v => { const r = analiseAskResp; analiseAskResp = null; if (r) r(v); };
 
-function abrirHotfixAsk(titulo, texto, codigo, confirmLabel, opcoes) {
+function abrirAnaliseAsk(titulo, texto, codigo, confirmLabel, opcoes) {
   responderAsk(null);                     // pergunta nova nao deixa a anterior pendurada
-  $('hotfixAsk').close();                 // showModal num dialog ja aberto lanca
-  $('hotfixAskTitle').textContent = titulo;
-  const p = $('hotfixAskText');
+  $('analiseAsk').close();                // showModal num dialog ja aberto lanca
+  $('analiseAskTitle').textContent = titulo;
+  const p = $('analiseAskText');
   p.textContent = texto;
   if (codigo) p.append(el('br'), el('code', null, codigo));   // caminho e dado medido: mono
 
-  const sel = $('hotfixAskRepo');
+  const sel = $('analiseAskRepo');
   sel.textContent = '';
-  $('hotfixAskSel').hidden = !opcoes;
+  $('analiseAskSel').hidden = !opcoes;
   for (const o of opcoes || []) sel.appendChild(new Option(o.t, o.v));
 
-  const yes = $('hotfixAskYes');
+  const yes = $('analiseAskYes');
   yes.hidden = !confirmLabel;
   if (confirmLabel) yes.textContent = confirmLabel;
-  $('hotfixAskNo').textContent = confirmLabel ? 'Cancelar' : 'Fechar';
-  $('hotfixAsk').showModal();
-  return new Promise(r => { hotfixAskResp = r; });
+  $('analiseAskNo').textContent = confirmLabel ? 'Cancelar' : 'Fechar';
+  $('analiseAsk').showModal();
+  return new Promise(r => { analiseAskResp = r; });
 }
 
 // Qual dos repositorios salvos usar. Devolve o INDICE na lista que o main acabou de
-// mandar — e ele quem tem os caminhos, e e essa ordem que hotfix-start vai reler.
+// mandar — e ele quem tem os caminhos, e e essa ordem que o canal `analise` vai reler.
 //
 // `semRepo` e o resumo: la a doc do repositorio e precisao a mais, entao "sem repositório"
-// e uma opcao e lista vazia nem chega a perguntar. A hotfix nao tem esse caminho: sem
-// repositorio nao ha onde criar a branch.
+// e uma opcao e lista vazia nem chega a perguntar. A analise nao tem esse caminho: sem
+// repositorio nao ha onde escrever o .md nem onde abrir o Claude.
 async function escolherRepo(semRepo) {
   const { repos = [] } = await window.api.getRepos();
   if (!repos.length) {
     if (semRepo) return -1;
-    const [titulo, texto] = hotfixErro({ error: 'NO_REPO' });
-    abrirHotfixAsk(titulo, texto, null, null);
+    const [titulo, texto] = analiseErro({ error: 'NO_REPO' });
+    abrirAnaliseAsk(titulo, texto, null, null);
     return null;
   }
 
   const opcoes = repos.map((r, i) => ({ v: String(i), t: r.path }));
   if (semRepo) opcoes.push({ v: '-1', t: 'Sem repositório' });
 
-  const v = await abrirHotfixAsk('Em qual repositório?',
-    semRepo ? 'O resumo lê os .md da raiz do repositório para chamar as units pelo nome.'
-            : 'A branch nasce da produção deste repositório, e o Claude abre dentro dele.',
+  const v = await abrirAnaliseAsk('Em qual repositório?',
+    semRepo ? 'Escolha o repositório do módulo deste ticket. O Claude lê os arquivos .md da raiz dele, como o CLAUDE.md, para citar no resumo as units, telas e rotinas pelo nome certo. Nenhum código-fonte é lido. Sem repositório o resumo também sai, só menos preciso.'
+            : 'Escolha o repositório do módulo deste ticket. O app grava nele, na raiz, um TICKET-<número>.md com o resumo, e abre o Claude dentro dessa pasta para ler o código e investigar a causa. Nada é alterado no git: nenhuma branch, nenhum commit.',
     null, 'Continuar', opcoes);
   return v === null ? null : Number(v);
 }
 
-function setHotfixando(on) {
+function setAnalisando(on) {
   $('resumoLoadbar').hidden = !on;
-  $('resumoHotfix').disabled = on;
-  $('resumoHotfixLabel').textContent = on ? 'Abrindo…' : 'Hotfix';
+  $('resumoAnalise').disabled = on;
+  $('resumoAnaliseLabel').textContent = on ? 'Abrindo…' : 'Análise';
 }
 
-async function pedirHotfix() {
+async function pedirAnalise() {
   const t = current;
   const id = t && ticketId(t);
   if (!id) return;
@@ -1142,40 +1135,19 @@ async function pedirHotfix() {
   const idx = await escolherRepo(false);
   if (idx === null) return;
 
-  setHotfixando(true);
-  const res = await window.api.hotfixProbe(id, t, idx);
-  setHotfixando(false);
+  // t e id vao junto: durante a pergunta o usuario pode ter trocado de aba, e reler
+  // `current` aqui abriria a analise do ticket errado.
+  setAnalisando(true);
+  const r = await window.api.analise(id, t, idx);
+  setAnalisando(false);
 
-  if (res.error) return hotfixFalhou(res);
-
-  // Workspace limpo nao tem o que avisar: nada vai ser guardado, entao nao ha pergunta.
-  if (res.dirty) {
-    const n = res.dirty === 1 ? '1 arquivo alterado' : `${res.dirty} arquivos alterados`;
-    const ok = await abrirHotfixAsk('Guardar as alterações antes?',
-      `Este repositório tem ${n} em ${res.branch}. Tudo vai para um stash antes de criar ${res.alvo} — nada se perde, e "git stash pop" traz de volta.`,
-      res.repo, 'Guardar e criar');
-    if (!ok) return;
+  if (!r.error) return closeResumo();   // sucesso nao tem faixa: o terminal abrindo e a confirmacao
+  if (ANALISE_CODIGOS.has(r.error)) {
+    const [titulo, texto, codigo] = analiseErro(r);
+    return abrirAnaliseAsk(titulo, texto, codigo, null);
   }
-
-  // t e id vao junto: entre as duas perguntas o usuario pode ter trocado de aba, e reler
-  // `current` aqui criaria a hotfix do ticket errado.
-  setHotfixando(true);
-  const r = await window.api.hotfixStart(id, t, idx);
-  setHotfixando(false);
-
-  if (r.error) return hotfixFalhou(r);
-  closeResumo();   // sucesso nao tem faixa: o terminal abrindo e a confirmacao
-}
-
-function hotfixFalhou(res) {
-  if (HOTFIX_CODIGOS.has(res.error)) {
-    const [titulo, texto, codigo] = hotfixErro(res);
-    return abrirHotfixAsk(titulo, texto, codigo, null);
-  }
-  // Depois que o stash existe, um erro que nao o cita faz o usuario achar que perdeu o
-  // trabalho. A faixa e a mesma do "nao foi possivel refazer": o resumo continua atras dela.
-  const onde = res.stash ? ` Suas alterações estão no stash "${res.stash}" — "git stash pop" traz de volta.` : '';
-  showNoticeIn('resumoNotice', 'down', 'Não foi possível criar a hotfix: ' + res.error + onde);
+  // A faixa e a mesma do "nao foi possivel refazer": o resumo continua atras dela.
+  showNoticeIn('resumoNotice', 'down', 'Não foi possível abrir a análise: ' + r.error);
 }
 
 /* ---------- atualizacao ---------- */
@@ -1211,7 +1183,7 @@ async function aplicarUpdate() {
   else showUpdate();
 }
 
-// Uma vez por abertura. Sem release, sem rede ou sem novidade a tela nao muda: a checagem
+// Na abertura e a cada clique em Atualizar. Sem release, sem rede ou sem novidade a tela nao muda: a checagem
 // nao pode custar nada a quem so quer ver os tickets. E nao pinta por cima de uma faixa que
 // ja esta na tela — quem estava ali e mais urgente, e o aviso volta no proximo load limpo.
 async function checkUpdate() {
@@ -1508,7 +1480,8 @@ async function saveConfig() {
 /* ---------- ligacao ---------- */
 
 function wire() {
-$('refresh').addEventListener('click', load);
+// So no clique, nao no timer: a API do GitHub sem token aceita 60 chamadas por hora.
+$('refresh').addEventListener('click', () => { load(); checkUpdate(); });
 $('settings').addEventListener('click', openConfig);
 $('q').addEventListener('input', render);
 
@@ -1536,17 +1509,17 @@ $('dResumir').addEventListener('click', pedirResumo);
 $('resumoClose').addEventListener('click', closeResumo);
 $('resumo').addEventListener('close', closeResumo);
 $('resumoRedo').addEventListener('click', () => openResumo(true));
-$('resumoHotfix').addEventListener('click', pedirHotfix);
-$('hotfixAskNo').addEventListener('click', () => $('hotfixAsk').close());
-$('hotfixAskForm').addEventListener('submit', e => {
+$('resumoAnalise').addEventListener('click', pedirAnalise);
+$('analiseAskNo').addEventListener('click', () => $('analiseAsk').close());
+$('analiseAskForm').addEventListener('submit', e => {
   e.preventDefault();
   // Responde ANTES de fechar: o close abaixo dispara o handler que resolve com null, e
   // responderAsk zera o pendente — quem chegar primeiro e a resposta que vale.
-  responderAsk($('hotfixAskSel').hidden ? true : $('hotfixAskRepo').value);
-  $('hotfixAsk').close();
+  responderAsk($('analiseAskSel').hidden ? true : $('analiseAskRepo').value);
+  $('analiseAsk').close();
 });
 // Cancelar, Esc e clique fora sao a mesma resposta: o usuario desistiu.
-$('hotfixAsk').addEventListener('close', () => responderAsk(null));
+$('analiseAsk').addEventListener('close', () => responderAsk(null));
 $('claudeAskNo').addEventListener('click', () => $('claudeAsk').close());
 $('claudeAskForm').addEventListener('submit', async e => {
   e.preventDefault();

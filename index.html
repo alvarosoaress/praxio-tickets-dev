@@ -66,11 +66,10 @@
     <g id="i-resumo" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
       <path d="M4.2 5.6v12.8"/><path d="M8.8 7h11"/><path d="M8.8 12h11"/><path d="M8.8 17h6.6"/>
     </g>
-    <!-- Duas bolas e um arco: a terceira bola da versao canonica vira mancha a 14px,
-         que e o tamanho em que os icones de barra renderizam. -->
-    <g id="i-branch" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M6.5 4.6v10.8"/><circle cx="17.5" cy="6.5" r="2.6"/><circle cx="6.5" cy="18" r="2.6"/>
-      <path d="M17.5 9.1a8.4 8.4 0 0 1-8.4 8.4"/>
+    <!-- A estrela do Claude em traco, nao preenchida: raios de comprimento desigual, como na
+         marca, mas na mesma folha dos outros icones. Sem cor propria — ver regra #7. -->
+    <g id="i-claude" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+      <path d="M12 9.8V3.4M13.1 10.1l2.4-4.2M13.9 10.9l5.2-3M14.2 12h4.4M13.9 13.1l5.7 3.3M13.1 13.9l2.5 4.3M12 14.2V20M10.9 13.9l-2.3 4M10.1 13.1l-5.5 3.2M9.8 12H5M10.1 10.9 4.7 7.8M10.9 10.1 8.7 6.3"/>
     </g>
     <!-- icones de tipo de arquivo: mesma folha, mesmo traco -->
     <g id="f-image" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
@@ -228,7 +227,7 @@
     <button class="btn btn-ghost" id="resumoRedo" title="Gerar de novo"><svg viewBox="0 0 24 24"><use href="#i-refresh"/></svg>Refazer</button>
     <!-- Depois de Refazer pela mesma regra da barra do detalhe: a acao que fica dentro do
          app vem antes da que sai dele. -->
-    <button class="btn btn-ghost" id="resumoHotfix" disabled title="Criar a branch de hotfix deste ticket e abrir o Claude nela"><svg viewBox="0 0 24 24"><use href="#i-branch"/></svg><span id="resumoHotfixLabel">Hotfix</span></button>
+    <button class="btn btn-ghost" id="resumoAnalise" disabled title="Escrever o briefing no repositório e abrir o Claude nele"><svg viewBox="0 0 24 24"><use href="#i-claude"/></svg><span id="resumoAnaliseLabel">Análise</span></button>
     <button class="btn btn-ghost btn-icon" id="resumoClose" title="Fechar (Esc)" aria-label="Fechar" autofocus><svg viewBox="0 0 24 24"><use href="#i-close"/></svg></button>
     <div class="loadbar" id="resumoLoadbar" hidden></div>
   </header>
@@ -256,25 +255,25 @@
   </form>
 </dialog>
 
-<!-- Um dialog para todos os momentos que cercam a hotfix: escolher o repositorio, avisar do
-     stash, e explicar o que impediu. Varios dialogs seriam varias telas para o mesmo
-     momento: "antes de comecar, isto". Falha no meio da sequencia NAO vem para ca — vai
+<!-- Um dialog para todos os momentos que cercam a analise: escolher o repositorio e explicar
+     o que impediu. Varios dialogs seriam varias telas para o mesmo momento: "antes de
+     comecar, isto". Falha ao escrever o briefing NAO vem para ca — vai
      para a faixa .notice do resumo, que e onde o app ja diz "rodou e quebrou" sem tirar da
      tela o que voce estava lendo.
 
      O select e o mesmo componente dos filtros da lista, so que ocupando a largura do
      dialog: caminho de repositorio e longo, e cortar o que se esta escolhendo seria pedir
      uma decisao sem mostrar as opcoes. -->
-<dialog id="hotfixAsk">
-  <form method="dialog" id="hotfixAskForm">
+<dialog id="analiseAsk">
+  <form method="dialog" id="analiseAskForm">
     <div class="dlg-body">
-      <h2 id="hotfixAskTitle"></h2>
-      <p id="hotfixAskText"></p>
-      <span class="sel sel-wide" id="hotfixAskSel" hidden><select id="hotfixAskRepo" aria-label="Repositório"></select><svg viewBox="0 0 24 24"><use href="#i-chevron"/></svg></span>
+      <h2 id="analiseAskTitle"></h2>
+      <p id="analiseAskText"></p>
+      <span class="sel sel-wide" id="analiseAskSel" hidden><select id="analiseAskRepo" aria-label="Repositório"></select><svg viewBox="0 0 24 24"><use href="#i-chevron"/></svg></span>
     </div>
     <div class="dlg-foot">
-      <button class="btn" type="button" id="hotfixAskNo">Fechar</button>
-      <button class="btn btn-primary" type="submit" id="hotfixAskYes" hidden></button>
+      <button class="btn" type="button" id="analiseAskNo">Fechar</button>
+      <button class="btn btn-primary" type="submit" id="analiseAskYes" hidden></button>
     </div>
   </form>
 </dialog>
@@ -300,7 +299,7 @@
       <span class="sel sel-wide"><select id="cfgLista" aria-label="Listagem"></select><svg viewBox="0 0 24 24"><use href="#i-chevron"/></svg></span>
 
       <h3>Repositórios</h3>
-      <p>Os repositórios locais onde você trabalha. Resumir e Hotfix perguntam qual usar. A lista fica só nesta máquina e salva sozinha — nada é lido do disco.</p>
+      <p>Os repositórios locais onde você trabalha. Resumir e Análise perguntam qual usar. A lista fica só nesta máquina e salva sozinha — nada é lido do disco.</p>
       <div id="cfgRepos"></div>
       <button class="btn" type="button" id="cfgAddRepo">Adicionar repositório</button>
 
