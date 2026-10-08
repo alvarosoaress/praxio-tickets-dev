@@ -32,6 +32,7 @@ cliente dela.
 npm install
 npm start          # abre o app contra a API de produção
 npm test           # checa parser de data, envelhecimento, filtro, sanitizador, XML
+npm run fake       # fila falsa + painel no navegador + app apontado para ela (tools/fake-api.js)
 npm run dist       # gera dist/Tickets Setup 1.0.0.exe (instalador one-click, ~105 MB)
 ```
 
@@ -39,8 +40,8 @@ Primeira execução pede a chave da API (104 caracteres), guardada em
 `%APPDATA%\tickets\config.json`. A chave está no `.env` do `portal-scraper` como `API_KEY`.
 
 Para desenvolver contra uma API local: `TICKETS_API=http://localhost:3311 npm start`.
-Com essa variável ligada, o console do renderer também sai no terminal e em
-`%APPDATA%\tickets\dev.log` (`services/devlog.js`) — sem isso, erro de CSP e de protocolo some
+Com essa variável ligada, o perfil vira `%APPDATA%\tickets-dev` (a chave real não é tocada) e o
+console do renderer também sai no terminal e em `%APPDATA%\tickets-dev\dev.log` (`services/devlog.js`) — sem isso, erro de CSP e de protocolo some
 em silêncio. Ver [`docs/BUILD-E-TESTE.md`](docs/BUILD-E-TESTE.md).
 
 ---
@@ -63,6 +64,7 @@ arquivo único, a doc dela mora em `docs/`.
 | `index.html`  | Markup + biblioteca de ícones SVG inline + CSP                                                                 |
 | `style.css`   | Tokens e componentes do mundo visual                                                                           |
 | `test.js`     | Checagens em `assert`, sem framework                                                                           |
+| `tools/`      | `fake-api.js`: a fila falsa para testar sem o portal. Fora do `.exe`                                           |
 
 **Duas fronteiras de processo**, e elas explicam quase todas as decisões do código:
 

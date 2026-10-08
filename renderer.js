@@ -1697,7 +1697,7 @@ document.addEventListener('keydown', e => {
 
 // Idade e o dado principal desta tela: recalcula sozinha, sem bater na API.
 setInterval(() => { if (tickets && tickets.length && !loading) render(); }, AGE_TICK_MS);
-timer = setInterval(load, REFRESH_MS);
+timer = setInterval(load, window.api.refreshMs || REFRESH_MS);
 
 load();
 checkUpdate();

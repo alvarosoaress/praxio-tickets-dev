@@ -646,3 +646,30 @@ assert.deepStrictEqual(st.por, { 939100: 'olhando' }, 'marca para status que nao
 const muitos = Array.from({ length: 30 }, (_, i) => ({ id: 'id' + i, nome: 'n' + i, cor: '#ffffff' }));
 assert.strictEqual(limparStatus({ defs: muitos }).defs.length, MAX_DEFS);
 assert.strictEqual(limparStatus({ defs: [{ id: 'a', nome: 'x'.repeat(80), cor: '#ffffff' }] }).defs[0].nome.length, MAX_NOME);
+
+
+// Fila falsa (tools/fake-api.js): o link precisa dar o id, e a data do /ultimos-tramites
+// precisa ser a do tramite do topo, que e o que move o "parado ha" no app.
+(async () => {
+  const { criarServidor } = require('./tools/fake-api.js');
+  const ticketIdDe = link => (/\/TicketPrincipal\/(\d+)/.exec(link || '') || [])[1] || null;
+  const srv = criarServidor().listen(0);
+  await new Promise(r => srv.once('listening', r));
+  const base = `http://127.0.0.1:${srv.address().port}`;
+  const get = p => fetch(base + p, { headers: { Authorization: 'x' } });
+  try {
+    assert.strictEqual((await fetch(base + '/scrape-custom/1')).status, 401, 'sem chave nao passa');
+    const { tickets } = await (await get('/scrape-custom/29920')).json();
+    const ids = tickets.map(t => ticketIdDe(t.link)).filter(Boolean);
+    assert.ok(ids.length && ids.length < tickets.length, 'semente tem ticket com id e ticket sem id');
+    const { datas } = await (await get('/ultimos-tramites?ids=' + ids.join(','))).json();
+    for (const id of ids) {
+      const { tramites } = await (await get(`/tramites/${id}?anexos=1`)).json();
+      assert.strictEqual(datas[id], tramites[0].date);
+      assert.ok(parseBR(tramites[0].date));
+    }
+    assert.strictEqual((await get('/anexo/900001')).headers.get('content-type'), 'image/png');
+  } finally {
+    srv.close();
+  }
+})().catch(e => { console.error(e); process.exit(1); });

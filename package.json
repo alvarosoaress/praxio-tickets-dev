@@ -6,7 +6,8 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
-    "test": "node test.js"
+    "test": "node test.js",
+    "fake": "node tools/fake-api.js --app"
   },
   "author": "",
   "type": "commonjs",

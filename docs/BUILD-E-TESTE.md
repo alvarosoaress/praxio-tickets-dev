@@ -12,6 +12,7 @@
 | `npm install` | Instala Electron, electron-builder, xlsx e mammoth |
 | `npm start` | Abre o app contra a API de produção |
 | `npm test` | Roda `test.js`. Deve imprimir `ok` e sair com 0 |
+| `npm run fake` | Sobe a fila falsa, abre o painel dela no navegador e o app já apontado para ela — ver abaixo |
 | `npm run dist` | Gera `dist/Tickets Setup 1.0.0.exe` (~105 MB, instalador one-click) |
 
 Primeira execução pede a chave da API. Ela fica em `%APPDATA%\tickets\config.json` e
@@ -58,12 +59,43 @@ TICKETS_API=http://localhost:3311 npm start
 
 Com a variável ligada (`services/portalapi.js`), além de trocar a base da API:
 
-- o console do renderer sai no terminal **e** em `%APPDATA%\tickets\dev.log`
+- o perfil passa a ser `%APPDATA%\tickets-dev` (`main.js`): chave, resumos, status e abas
+  de teste não encostam nos do Tickets instalado, e salvar uma chave falsa não apaga a real;
+- o console do renderer sai no terminal **e** em `%APPDATA%\tickets-dev\dev.log`
   (`services/devlog.js`). Isso existe porque o `.exe` empacotado não tem console, e sem isso
   violação de CSP e erro de protocolo somem em silêncio;
 - a variável não tem efeito no build: o `.exe` distribuído aponta para produção.
 
-### A API local
+### A fila falsa (`tools/fake-api.js`)
+
+Para testar o app sem o portal: ticket novo, ticket saindo da fila, envelhecimento, erro da
+API. `npm run fake` sobe um servidor em `http://localhost:3311` que imita as rotas que o app
+chama, abre o painel dele no navegador e lança o app com `TICKETS_API` já apontado. Sem
+`--app` (`node tools/fake-api.js`) sobe só o servidor.
+
+Na primeira vez o app pede a chave: a do painel (`x` × 104). O servidor aceita qualquer uma.
+
+A semente tem um ticket por faixa de idade, um status por cor, um ticket com o formulário de
+escalação e um anexo de cada família (png, pdf, xlsx, sql em cp1252, xml, txt, zip), e um
+ticket com `link` sem id. No painel:
+
+| Ação | O que exercita no app |
+| --- | --- |
+| + Novo ticket | Toast "Ticket novo" + som |
+| Remover | Ticket some da lista; a aba dele não volta ao reabrir |
+| + Trâmite (com ou sem anexo) | "Parado há" volta para agora; cache do detalhe e resumo "desatualizado" |
+| Envelhecer N h | Faixas do âmbar |
+| Mudar status | Cor do status e filtros |
+| Modo de falha | `401 Falha no login`, `403`, `500`, lento, `/ultimos-tramites` 404 (cai no `/tramites` por ticket), offline |
+| Resetar | Volta à semente |
+
+Aberto por `npm run fake`, o app atualiza a cada **5 s** em vez de 5 min:
+`TICKETS_REFRESH_MS` → `additionalArguments` (`main.js`) → `api.refreshMs` (`preload.js`).
+Rodando o servidor sozinho, é F5 no app. O estado vive só na
+memória do servidor: fechar volta para a semente. `.docx` não está na semente: gerar o zip à
+mão não se paga. Resumo e Análise continuam chamando o `claude` de verdade.
+
+### A API local de verdade
 
 A API de verdade (`portal-scraper`) **não sobe nesta máquina**: ela roda migrations contra
 um PostgreSQL remoto que está atrás de firewall, e morre no boot com `ETIMEDOUT`.
@@ -84,22 +116,6 @@ nada no stub.
 
 O stub vive no scratchpad da sessão, não no repositório: é andaime, descartado quando a
 rota sobe. Reconstruí-lo custa poucas linhas e vale de novo na próxima rota nova.
-
-### Anexos sintéticos
-
-A fila real raramente tem `.xlsx`, `.docx` ou `.pdf`. Para exercitar esses caminhos, o stub
-injeta entradas falsas na listagem e serve arquivos do disco:
-
-```js
-const FAKE = {
-  '900001': { file: 'teste.xlsx',  name: 'Resumo de horas.xlsx',  ext: 'xlsx' },
-  '900002': { file: 'teste.docx',  name: 'Especificacao.docx',    ext: 'docx' },
-  '900003': { file: 'teste.pdf',   name: 'Laudo tecnico.pdf',     ext: 'pdf'  },
-};
-```
-
-Isso cobre o caminho inteiro — chip → IPC → conversor → sanitizador → DOM. O `.xlsx` dá
-para gerar com o próprio SheetJS; o `.pdf` mínimo dá para escrever à mão em ~15 linhas.
 
 ---
 

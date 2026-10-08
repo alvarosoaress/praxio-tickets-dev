@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const refresh = Number((process.argv.find(a => a.startsWith('--refresh-ms=')) || '').split('=')[1]);
+
 contextBridge.exposeInMainWorld('api', {
+  refreshMs: refresh >= 1000 ? refresh : null,
   hasKey: () => ipcRenderer.invoke('has-key'),
   setKey: key => ipcRenderer.invoke('set-key', key),
   loadTickets: () => ipcRenderer.invoke('tickets'),
