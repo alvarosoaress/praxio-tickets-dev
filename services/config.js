@@ -37,4 +37,9 @@ const setRepos = list => writeCfg({ ...readCfg(), repos: list });
 const lista = () => readCfg().lista;
 const setLista = id => writeCfg({ ...readCfg(), lista: id });
 
-module.exports = { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos, lista, setLista };
+// Token pessoal do Azure DevOps (PAT) e o dono dele, gravado junto quando o token foi
+// conferido: e o dono quem fica como responsavel pelo Bug. Quem confere e ipc/azure.js.
+const azure = () => { const c = readCfg(); return c.azurePat ? { pat: c.azurePat, email: c.azureEmail, nome: c.azureNome } : null; };
+const setAzure = a => writeCfg({ ...readCfg(), azurePat: a.pat, azureEmail: a.email, azureNome: a.nome });
+
+module.exports = { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos, lista, setLista, azure, setAzure };

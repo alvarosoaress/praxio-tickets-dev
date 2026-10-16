@@ -1211,6 +1211,12 @@ dialog::backdrop { background: rgba(4, 5, 7, .74); }
    subir para --text: peso maior num texto que continua --text-dim so pesa, nao destaca. */
 .dlg-body p b { font-weight: 500; color: var(--text); }
 .dlg-body p a { color: var(--info); text-underline-offset: 2px; }
+/* Passo a passo: mesma voz do paragrafo, numerado porque a ordem e a instrucao. */
+.dlg-steps { margin: 0 0 16px; padding-left: 20px; font-size: 12.5px; line-height: 1.5; color: var(--text-dim); }
+.dlg-steps li + li { margin-top: 4px; }
+.dlg-steps b { font-weight: 500; color: var(--text); }
+.dlg-steps code { font: 400 11.5px/1.4 var(--mono); color: var(--text-faint); user-select: text; }
+.dlg-steps a { color: var(--info); text-underline-offset: 2px; }
 
 .field label {
   display: block;

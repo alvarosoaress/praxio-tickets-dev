@@ -56,8 +56,8 @@ arquivo único, a doc dela mora em `docs/`.
 | Arquivo       | Papel                                                                                                          |
 | ------------- | -------------------------------------------------------------------------------------------------------------- |
 | `main.js`     | Só o arquivo principal: registra o scheme, liga os módulos de IPC, abre a janela. ~40 linhas                   |
-| `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`, `briefing`, `update`, `status`  |
-| `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`, `analise`, `update`, `status`             |
+| `services/`   | Um adaptador por sistema externo: `config`, `portalapi`, `anexo`, `claude`, `devlog`, `briefing`, `update`, `status`, `azure` |
+| `ipc/`        | Um `register()` por domínio: `config`, `tickets`, `anexos`, `resumo`, `analise`, `update`, `status`, `azure`    |
 | `preload.js`  | Ponte `contextBridge`. 14 funções, nada além disso                                                             |
 | `renderer.js` | Toda a UI: lista, detalhe, filtros, visualizador de anexo, estados de erro                                     |
 | `sanitize.js` | Allowlist de HTML. Fronteira de confiança — ver regra #2                                                       |
@@ -215,6 +215,10 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Meus status somem ao reabrir o app              | `%APPDATA%	ickets\status.json` não gravou. Eles salvam sozinhos a cada mudança, não no botão Salvar — que governa só a chave |
 | Marquei um ticket e a marca não apareceu        | Nome ou cor reprovados na fronteira: `ipc/status.js` só aceita `#rrggbb` e nome não-vazio, e descarta o resto em silêncio |
 | O status que apaguei levou as marcas junto      | Esperado: marca para status inexistente não é gravada (`limpar`, `ipc/status.js`). Renomear não solta nada — a marca guarda o id, não o nome |
+| "Criar Bug" diz "Token do Azure não configurado" | Cada dev cola o próprio PAT (escopo Work Items Read & write) em Configurações → Azure DevOps. O dono do token é o responsável do Bug |
+| "Criar Bug" abre um card antigo em vez de criar | Esperado: já existe Bug com o id do portal no campo Número ticket (`bugExistente`, `services/azure.js`). Um Bug por ticket |
+| Bug criado sem algum anexo                      | Cada anexo é baixado do portal e subido ao Azure em memória, um por vez (`ipc/azure.js`). O que falha não derruba o Bug e aparece nomeado no aviso. Acima de 60 MB não sobe |
+| Bug sem Tag/Produto                             | O módulo do ticket não está em `MODULOS` (`services/azure.js`). A tabela é fixa porque as tags do Azure têm duplicatas por módulo |
 | Listagem nova não aparece em Configurações      | Ela só existe se estiver em `LISTAS` (`services/portalapi.js`). Id gravado que saiu de lá cai na primeira da lista, sem aviso |
 | Um status não aparece no filtro de meus status  | Só entram os que estão marcados em algum ticket da fila — mesma regra dos outros três selects |
 
@@ -233,7 +237,9 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
   "pré-visualização sem precisar baixar nada".
 - **Hardcodar a chave da API** em qualquer arquivo versionado.
 - **Mandar conteúdo de ticket para qualquer serviço externo sem o gate de consentimento.**
-  Hoje o único destino é o `claude` CLI, e ele passa por `claudeOk`.
+  Hoje são dois destinos: o `claude` CLI, que passa por `claudeOk`, e o Azure DevOps da
+  Praxio, que só recebe com o token pessoal que o próprio dev colou em Configurações, cujo
+  texto diz o que sai — e cada Bug ainda pede confirmação no clique.
 - **Subir a versão ou publicar o `.exe`** para outras máquinas.
 
 ---

@@ -25,5 +25,9 @@ contextBridge.exposeInMainWorld('api', {
   updateApply: url => ipcRenderer.invoke('update-apply', url),
   appVersion: () => ipcRenderer.invoke('app-version'),
   statusGet: () => ipcRenderer.invoke('status-get'),
-  statusSet: blob => ipcRenderer.invoke('status-set', blob)
+  statusSet: blob => ipcRenderer.invoke('status-set', blob),
+  azureGet: () => ipcRenderer.invoke('azure-get'),
+  azureSet: pat => ipcRenderer.invoke('azure-set', pat),
+  azureBugDe: id => ipcRenderer.invoke('azure-bug-de', id),
+  azureBug: (id, ticket, tramites) => ipcRenderer.invoke('azure-bug', { id, ticket, tramites })
 });

@@ -10,6 +10,7 @@ const ipcResumo = require('./ipc/resumo');
 const ipcAnalise = require('./ipc/analise');
 const ipcUpdate = require('./ipc/update');
 const ipcStatus = require('./ipc/status');
+const ipcAzure = require('./ipc/azure');
 const { attachDevLog } = require('./services/devlog');
 
 // anexo://<id> serve os bytes do anexo vindos da API. Assim <img>, <video> e o
@@ -27,6 +28,7 @@ ipcResumo.register();
 ipcAnalise.register();
 ipcUpdate.register();
 ipcStatus.register();
+ipcAzure.register();
 
 // Contra API de teste o perfil e outro: salvar a chave falsa apagaria a real, e o
 // localStorage nao briga com o Tickets instalado aberto. Precisa vir antes do ready.

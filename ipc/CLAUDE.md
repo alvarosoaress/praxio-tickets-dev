@@ -12,6 +12,7 @@ A fronteira com o renderer. Um arquivo por domínio, cada um exportando `registe
 | `analise.js` | `analise`                                        |
 | `update.js`  | `update-check`, `update-apply`                   |
 | `status.js`  | `status-get`, `status-set`                        |
+| `azure.js`   | `azure-get`, `azure-set`, `azure-bug-de`, `azure-bug` |
 
 `registerProtocol()` é a exceção: precisa rodar **dentro** do `whenReady`. O
 `registerSchemesAsPrivileged` que ele exige fica em `main.js`, no escopo de módulo, porque

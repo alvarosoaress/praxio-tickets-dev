@@ -647,6 +647,35 @@ const muitos = Array.from({ length: 30 }, (_, i) => ({ id: 'id' + i, nome: 'n' +
 assert.strictEqual(limparStatus({ defs: muitos }).defs.length, MAX_DEFS);
 assert.strictEqual(limparStatus({ defs: [{ id: 'a', nome: 'x'.repeat(80), cor: '#ffffff' }] }).defs[0].nome.length, MAX_NOME);
 
+// Bug no Azure: a data do portal e DD/MM, o Numero ticket e integer, e o Repro Steps e HTML
+// montado com texto do portal — titulo e resumo nao podem virar tag.
+const { dataAzure, tituloBug, reproHtml, camposBug } = require('./services/azure.js');
+assert.strictEqual(dataAzure('15/10/2026 13:12:52'), '2026-10-15T13:12:52-03:00');
+assert.strictEqual(dataAzure('04/09/2026 10:04'), '2026-09-04T10:04:00-03:00');
+assert.strictEqual(dataAzure(''), null);
+assert.strictEqual(tituloBug({ number: '1026-002742', title: 'Falha' }), '1026-002742 - Falha');
+assert.strictEqual(tituloBug({ number: '1', title: 'x'.repeat(400) }).length, 255);
+
+const escTr = { date: '16/10/2026 14:39', author: 'SIDNEI', origin: 'privado', content: 'Versão de Teste: 1 Caminho: a Base de Teste: b', contentHtml: '<ul><li>Versão</li></ul>' };
+const repro = reproHtml({ number: '1026-002742', client: 'A<b>', person: 'P' }, '945489',
+  [{ content: 'resposta solta' }, escTr], 'ONDE\nNo <script>x</script>');
+assert.ok(repro.includes('TicketPrincipal/945489'), 'link montado do id');
+assert.ok(repro.includes('<ul><li>Versão</li></ul>'), 'escalacao vai com o HTML dela');
+assert.ok(!repro.includes('resposta solta'), 'tramite que nao e escalacao nao entra');
+assert.ok(repro.includes('A&lt;b&gt;') && repro.includes('&lt;script&gt;') && !repro.includes('<script>'), 'texto do portal e do resumo sai escapado');
+assert.ok(repro.includes('<b>ONDE</b>'), 'rotulo do resumo vira negrito');
+
+const campos = camposBug({ number: '1', title: 't', module: 'wce', opening: '15/10/2026 13:12:52' }, '945489', [], 'r', 'dev@x');
+const campo = p => (campos.find(c => c.path === p) || {}).value;
+assert.strictEqual(campo('/fields/System.AssignedTo'), 'dev@x', 'responsavel e o dono do token');
+assert.strictEqual(campo('/fields/Custom.3ee72faf-7179-42ea-b6b8-6482806f3f78'), 945489, 'Numero ticket e integer');
+assert.strictEqual(campo('/fields/System.Tags'), 'WCE - WinCE Controle de Estoque e Almoxarifado');
+assert.ok(!campos.some(c => /AttachedFile/.test(JSON.stringify(c))), 'sem anexo subido, nenhuma relacao de anexo');
+const comAnexo = camposBug({ number: '1', title: 't' }, '1', [], 'r', 'dev@x', [{ url: 'https://u/1', name: 'a.png' }]);
+assert.strictEqual(comAnexo.filter(c => c.value && c.value.rel === 'AttachedFile').length, 1, 'anexo subido vira relacao');
+const semModulo = camposBug({ number: '1', title: 't', module: 'XYZ' }, '1', [], 'r', 'dev@x');
+assert.ok(!semModulo.some(c => c.path === '/fields/System.Tags' || c.path === '/fields/Custom.Produto'), 'modulo fora da tabela cria sem os dois');
+
 
 // Fila falsa (tools/fake-api.js): o link precisa dar o id, e a data do /ultimos-tramites
 // precisa ser a do tramite do topo, que e o que move o "parado ha" no app.

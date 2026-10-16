@@ -695,6 +695,8 @@ async function openDetail(t, refazer, ui) {
   renderDetailHeader(t);
   $('back').focus();
   $('dResumir').disabled = true;   // so libera quando os tramites chegam
+  $('dBug').disabled = true;
+  pintarBug(null);
 
   if (!id) {
     showStateIn('dState', 'error', 'i-alert', 'Ticket sem id', 'O portal não devolveu um link com id numérico para este ticket, então não dá para buscar os trâmites.');
@@ -705,6 +707,8 @@ async function openDetail(t, refazer, ui) {
   if (cache) {
     detail = cache;
     $('dResumir').disabled = false;
+    $('dBug').disabled = bugEmVoo;
+    checarBug(t, id);
     renderTramites();
     if (ui) $('dScroll').scrollTop = ui.top;
     renderAnexos(anexosDe(cache.tramites));
@@ -729,6 +733,8 @@ async function openDetail(t, refazer, ui) {
   detail = d;
   cachePut(id, t.lastUpdate, d);
   $('dResumir').disabled = false;
+  $('dBug').disabled = bugEmVoo;
+  checarBug(t, id);
   renderTramites();
   if (ui) $('dScroll').scrollTop = ui.top;
   renderAnexos(anexosDe(res.tramites));
@@ -1150,6 +1156,115 @@ async function pedirAnalise() {
   showNoticeIn('resumoNotice', 'down', 'Não foi possível abrir a análise: ' + r.error);
 }
 
+/* ---------- bug no azure ---------- */
+
+// Um Bug por vez: o fluxo pode levar o tempo de um resumo inteiro, e trocar de aba no meio
+// nao pode religar o botao para um segundo card.
+let bugEmVoo = false;
+
+// Apagado, nunca escondido nem renomeado: o botao continua sendo o mesmo enquanto o Bug
+// nasce, e a barra do detalhe diz que o app esta trabalhando.
+function setBug(on) {
+  bugEmVoo = on;
+  $('dBug').disabled = on || !detail;
+  if (on) $('dLoadbar').hidden = false;
+  else if (detail) $('dLoadbar').hidden = true;
+}
+
+// Com o Bug criado, por qualquer dev, o botao passa a levar ate ele.
+function pintarBug(url) {
+  $('dBug').dataset.url = url || '';
+  $('dBugLabel').textContent = url ? 'Ver Bug' : 'Criar Bug';
+  $('dBug').title = url ? 'Abrir o Bug deste ticket no Azure DevOps (botão direito copia o link)' :'Criar o Bug deste ticket no Azure DevOps';
+}
+
+async function checarBug(t, id) {
+  const r = await window.api.azureBugDe(id);
+  if (current === t && r.url) pintarBug(r.url);
+}
+
+function clicarBug() {
+  const url = $('dBug').dataset.url;
+  if (url) return window.open(url);
+  pedirBug();
+}
+
+// O card leva o resumo, entao ele tem que existir e estar em dia. Ao contrario do botao
+// Resumir, aqui o refazer e automatico: quem clicou em Criar Bug ja decidiu pagar por ele,
+// e um card com resumo anterior ao ultimo tramite nasceria contando a historia errada.
+async function garantirResumo(t, id, tram) {
+  let refazer = false;
+  let res = await window.api.resumo(id, t, tram, false);
+  if (res.stale) {
+    refazer = true;
+    res = await window.api.resumo(id, t, tram, true);
+  }
+  if (res.error === 'NEED_REPO') {
+    const idx = await escolherRepo(true);
+    if (idx === null) return false;
+    res = await window.api.resumo(id, t, tram, refazer, idx);
+  }
+  if (res.error === 'NO_CONSENT') {
+    $('claudeAsk').showModal();
+    return false;
+  }
+  if (res.error) {
+    abrirAnaliseAsk('Não foi possível resumir', 'O Bug não foi criado, porque ele leva o resumo do ticket. ' + res.error, null, null);
+    return false;
+  }
+  return true;
+}
+
+function bugErro(res) {
+  switch (res.error) {
+    case 'NO_PAT': return ['Token do Azure não configurado',
+      'Abra Configurações → Azure DevOps e cole o seu token pessoal. O Bug é criado em seu nome.'];
+    case 'NO_RESUMO': return ['Sem resumo para levar', 'O resumo deste ticket não foi encontrado. Tente de novo.'];
+    default: return ['Não foi possível criar o Bug', res.error];
+  }
+}
+
+// Sem token, Criar Bug leva direto ao campo, com o passo a passo de como gerar um.
+async function pedirToken() {
+  await openConfig();
+  pintarAz(null);
+  $('cfgAz').scrollIntoView({ block: 'center' });
+  $('cfgAz').focus();
+}
+
+async function pedirBug() {
+  const t = current;
+  const id = t && ticketId(t);
+  if (!id || !detail) return;
+  const tram = detail.tramites;   // t e tram ficam presos: trocar de aba no meio nao troca o ticket
+
+  const n = new Set(tram.flatMap(tr => tr.anexos || []).map(x => x.id)).size;
+  const { nome } = await window.api.azureGet();
+  if (!nome) return pedirToken();
+
+  const ok = await abrirAnaliseAsk('Criar Bug no Azure?',
+    `O app cria no board Run SIGAI o Bug "${t.number} - ${t.title || 'Sem título'}", atribuído a ${nome}, com o trâmite de escalação, o resumo e ${n === 1 ? '1 anexo' : n + ' anexos'} do ticket. Se o resumo ainda não existe ou é anterior ao último trâmite, ele é gerado antes.`,
+    null, 'Criar Bug');
+  if (!ok) return;
+
+  setBug(true);
+  if (!await garantirResumo(t, id, tram)) return setBug(false);
+  const r = await window.api.azureBug(id, t, tram);
+  setBug(false);
+
+  if (r.error) return abrirAnaliseAsk(...bugErro(r), null, null);
+  if (current === t) pintarBug(r.url);
+  window.open(r.url);
+  if (r.falhas && r.falhas.length) {
+    abrirAnaliseAsk('Bug criado sem alguns anexos',
+      `O Bug ${r.id} foi criado e aberto no navegador, mas estes anexos não subiram: ${r.falhas.join(', ')}. Anexe-os à mão pelo portal.`, null, null);
+  }   // abre no navegador: o card aparecendo e a confirmacao
+  if (r.existia) {
+    abrirAnaliseAsk('Este ticket já tem Bug',
+      `O Bug ${r.id} já existe para este ticket e foi aberto no navegador. Nenhum card novo foi criado.`, null, null);
+  }
+}
+
 /* ---------- atualizacao ---------- */
 
 let novaVersao = null;   // { version, local, url } enquanto houver release mais nova
@@ -1327,6 +1442,12 @@ function desmascarar() {
   $('cfgCount').textContent = '0 / 104';
 }
 
+// Sem token, o passo a passo de como gerar um aparece acima do campo.
+function pintarAz(nome) {
+  $('cfgAzInfo').textContent = nome ? 'token de ' + nome : 'nenhum token';
+  $('cfgAzHelp').hidden = Boolean(nome);
+}
+
 async function openConfig() {
   const dlg = $('cfg');
   $('cfgError').textContent = '';
@@ -1348,6 +1469,10 @@ async function openConfig() {
   else $('cfgKey').focus();
 
   window.api.appVersion().then(v => { $('cfgVersion').textContent = v; });
+  $('cfgAz').value = '';
+  $('cfgAzError').textContent = '';
+  $('cfgAzField').dataset.invalid = '0';
+  window.api.azureGet().then(a => pintarAz(a.nome));
 
   cfgRepos = res.repos || [];
   renderRepos();
@@ -1510,6 +1635,29 @@ $('resumoClose').addEventListener('click', closeResumo);
 $('resumo').addEventListener('close', closeResumo);
 $('resumoRedo').addEventListener('click', () => openResumo(true));
 $('resumoAnalise').addEventListener('click', pedirAnalise);
+$('dBug').addEventListener('click', clicarBug);
+// Botao direito no Ver Bug copia o link. O rotulo confirma por um instante e volta.
+$('dBug').addEventListener('contextmenu', async e => {
+  const url = $('dBug').dataset.url;
+  if (!url) return;
+  e.preventDefault();
+  await navigator.clipboard.writeText(url);
+  $('dBugLabel').textContent = 'Link copiado';
+  setTimeout(() => { if ($('dBug').dataset.url === url) $('dBugLabel').textContent = 'Ver Bug'; }, 1500);
+});
+// Salva sozinho, como os repositorios: o rodape governa so a chave da API. O main confere
+// o token no Azure antes de gravar, entao o que aparece embaixo e o dono de verdade.
+$('cfgAz').addEventListener('change', async e => {
+  const pat = e.target.value.trim();
+  if (!pat) return;
+  $('cfgAzInfo').textContent = 'conferindo…';
+  const r = await window.api.azureSet(pat);
+  $('cfgAzField').dataset.invalid = r.error ? '1' : '0';
+  $('cfgAzError').textContent = r.error || '';
+  if (r.error) return window.api.azureGet().then(a => pintarAz(a.nome));
+  e.target.value = '';
+  pintarAz(r.nome);
+});
 $('analiseAskNo').addEventListener('click', () => $('analiseAsk').close());
 $('analiseAskForm').addEventListener('submit', e => {
   e.preventDefault();

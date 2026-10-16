@@ -71,6 +71,9 @@
     <g id="i-claude" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
       <path d="M12 9.8V3.4M13.1 10.1l2.4-4.2M13.9 10.9l5.2-3M14.2 12h4.4M13.9 13.1l5.7 3.3M13.1 13.9l2.5 4.3M12 14.2V20M10.9 13.9l-2.3 4M10.1 13.1l-5.5 3.2M9.8 12H5M10.1 10.9 4.7 7.8M10.9 10.1 8.7 6.3"/>
     </g>
+    <g id="i-bug" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="8" y="7.5" width="8" height="12" rx="4"/><path d="M12 11.5v8"/><path d="M9.8 7.8 8.4 5M14.2 7.8 15.6 5"/><path d="M8 11.5H4.8M8 15.5H4.8M16 11.5h3.2M16 15.5h3.2"/>
+    </g>
     <!-- icones de tipo de arquivo: mesma folha, mesmo traco -->
     <g id="f-image" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
       <rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4.5 17 4.8-4.4 3.4 3 3-2.4 3.8 3.4"/>
@@ -159,6 +162,7 @@
     <div class="bar-right">
       <span class="updated" id="dAge"></span>
       <button class="btn" id="dResumir" title="Resumir o ticket com o Claude"><svg viewBox="0 0 24 24"><use href="#i-resumo"/></svg><span id="dResumirLabel">Resumir</span></button>
+      <button class="btn" id="dBug" title="Criar o Bug deste ticket no Azure DevOps"><svg viewBox="0 0 24 24"><use href="#i-bug"/></svg><span id="dBugLabel">Criar Bug</span></button>
       <a class="btn" id="dPortal" target="_blank" rel="noreferrer"><svg viewBox="0 0 24 24"><use href="#i-external"/></svg>Abrir no portal</a>
     </div>
     <div class="loadbar" id="dLoadbar" hidden></div>
@@ -302,6 +306,27 @@
       <p>Os repositórios locais onde você trabalha. Resumir e Análise perguntam qual usar. A lista fica só nesta máquina e salva sozinha — nada é lido do disco.</p>
       <div id="cfgRepos"></div>
       <button class="btn" type="button" id="cfgAddRepo">Adicionar repositório</button>
+
+      <h3>Azure DevOps</h3>
+      <p>Criar Bug, no detalhe do ticket, abre o card no board Run SIGAI em seu nome. Cole o seu token pessoal com o escopo <b>Work Items (Read &amp; write)</b>, gerado em <a href="https://dev.azure.com/praxio/_usersSettings/tokens" target="_blank" rel="noreferrer">dev.azure.com/praxio</a>. Ele fica só nesta máquina e salva sozinho ao colar.</p>
+      <p>Cada Bug leva ao Azure da Praxio o número, título, cliente, solicitante e abertura do ticket, o trâmite de escalação inteiro, o resumo do Claude e todos os anexos do ticket.</p>
+      <!-- So aparece sem token gravado: com token, o passo a passo nao tem mais o que ensinar. -->
+      <ol class="dlg-steps" id="cfgAzHelp" hidden>
+        <li>Abra <a href="https://dev.azure.com/praxio/_usersSettings/tokens" target="_blank" rel="noreferrer">dev.azure.com/praxio/_usersSettings/tokens</a> e clique em <b>New Token</b>.</li>
+        <li>Dê um nome, por exemplo <code>tickets-app</code>.</li>
+        <li>Em <b>Organization</b>, deixe <code>praxio</code>.</li>
+        <li>Em <b>Expiration</b>, escolha a validade. O máximo é 1 ano, e depois disso o token precisa ser renovado.</li>
+        <li>Em <b>Scopes</b>, marque <b>Custom defined</b> e depois <b>Work Items → Read &amp; write</b>. Não marque mais nada.</li>
+        <li>Clique em <b>Create</b> e copie o token na hora, porque ele só aparece uma vez. Cole aqui embaixo.</li>
+      </ol>
+      <div class="field" id="cfgAzField">
+        <label for="cfgAz">Token pessoal</label>
+        <input id="cfgAz" type="password" placeholder="cole o token aqui" autocomplete="off" spellcheck="false">
+        <div class="counter">
+          <span id="cfgAzError" class="err"></span>
+          <span id="cfgAzInfo">nenhum token</span>
+        </div>
+      </div>
 
       <h3>Meus status</h3>
       <p>A marca é sua e fica só nesta máquina — o botão direito numa linha da lista aplica. Nome e cor salvam sozinhos.</p>
