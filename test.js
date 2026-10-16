@@ -6,9 +6,14 @@ const { safeHref, KEEP, NUKE, PORTAL_BASE } = require('./sanitize.js');
 const { buildPrompt, buildContent, parseResult, parseSize, escolherAnexos, lerDocs, MAX_PROMPT_CHARS, MAX_DOCS_CHARS,
         MAX_IMAGENS, MAX_PDFS, MAX_TEXTOS, MAX_ANEXOS, MAX_TEXTO_TOTAL } = require('./services/claude.js');
 const { respHeaders } = require('./services/anexo.js');
-const { parseResumo } = require('./renderer.js');
+const { parseResumo, notasBlocos } = require('./renderer.js');
 const { slugTicket, deepLink, buildBriefing, MAX_SLUG } = require('./services/briefing.js');
 const { maisNova } = require('./services/update.js');
+
+// notas da release: markdown vira blocos de texto, sem marcacao
+assert.deepStrictEqual(notasBlocos('## Novidades\r\n\n- Botão **Criar Bug**\n* `Ver Bug` copia o link\nTexto solto'), [
+  { k: 'h', t: 'Novidades' }, { k: 'li', t: 'Botão Criar Bug' }, { k: 'li', t: 'Ver Bug copia o link' }, { k: 'p', t: 'Texto solto' }]);
+assert.deepStrictEqual(notasBlocos(null), []);
 
 // parser: o portal manda "DD/MM/YYYY HH:mm:ss", que new Date() le como MM/DD
 const d = parseBR('14/09/2026 15:59:55');

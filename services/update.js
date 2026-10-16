@@ -59,6 +59,7 @@ async function checar() {
       local: app.getVersion(),
       url: asset.browser_download_url,
       bytes: asset.size || 0,
+      notas: String(b.body || '').slice(0, 20_000),   // markdown da release, vira texto na tela
       page: `https://github.com/${REPO}/releases/latest`
     };
   } catch {

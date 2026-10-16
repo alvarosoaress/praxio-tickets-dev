@@ -1298,6 +1298,37 @@ async function aplicarUpdate() {
   else showUpdate();
 }
 
+// Markdown da release -> blocos de texto. So o que release costuma ter: titulo, item de
+// lista e paragrafo. Negrito e codigo perdem a marcacao em vez de virar HTML.
+function notasBlocos(md) {
+  const out = [];
+  for (const raw of String(md || '').split(/\r?\n/)) {
+    const line = raw.trim().replace(/\*\*|__|`/g, '');
+    if (!line) continue;
+    const h = /^#{1,6}\s+(.*)/.exec(line), li = /^[-*+]\s+(.*)/.exec(line);
+    if (h) out.push({ k: 'h', t: h[1] });
+    else if (li) out.push({ k: 'li', t: li[1] });
+    else out.push({ k: 'p', t: line });
+  }
+  return out;
+}
+
+function abrirNovidades() {
+  $('novidadesVer').textContent = `Você está na ${novaVersao.local}. A nova é a ${novaVersao.version}.`;
+  const box = $('novidadesNotas');
+  box.textContent = '';
+  const blocos = notasBlocos(novaVersao.notas);
+  if (!blocos.length) blocos.push({ k: 'p', t: 'Esta release não descreve as novidades.' });
+  let ul = null;
+  for (const b of blocos) {
+    if (b.k !== 'li') ul = null;
+    else if (!ul) ul = box.appendChild(el('ul', 'dlg-steps'));
+    (ul || box).appendChild(el(b.k === 'h' ? 'h3' : b.k, b.k === 'h' ? 'rs-k' : null, b.t));
+  }
+  $('novidadesYes').disabled = baixando;
+  if (!$('novidades').open) $('novidades').showModal();
+}
+
 // Na abertura e a cada clique em Atualizar. Sem release, sem rede ou sem novidade a tela nao muda: a checagem
 // nao pode custar nada a quem so quer ver os tickets. E nao pinta por cima de uma faixa que
 // ja esta na tela — quem estava ali e mais urgente, e o aviso volta no proximo load limpo.
@@ -1306,6 +1337,13 @@ async function checkUpdate() {
   if (res.error || res.atual || !res.url) return;
   novaVersao = res;
   if ($('notice').hidden) showUpdate();
+  // O popup sai uma vez por versao: o refresh tambem checa, e reabrir a cada clique seria
+  // cobranca. A faixa ambar continua ate instalar.
+  let vista = null;
+  try { vista = localStorage.getItem('tickets.novidades'); } catch {}
+  if (vista === res.version) return;
+  try { localStorage.setItem('tickets.novidades', res.version); } catch {}
+  abrirNovidades();
 }
 
 /* ---------- carga ---------- */
@@ -1669,6 +1707,8 @@ $('analiseAskForm').addEventListener('submit', e => {
 // Cancelar, Esc e clique fora sao a mesma resposta: o usuario desistiu.
 $('analiseAsk').addEventListener('close', () => responderAsk(null));
 $('claudeAskNo').addEventListener('click', () => $('claudeAsk').close());
+$('novidadesNo').addEventListener('click', () => $('novidades').close());
+$('novidadesForm').addEventListener('submit', () => aplicarUpdate());
 $('claudeAskForm').addEventListener('submit', async e => {
   e.preventDefault();
   $('claudeAsk').close();
@@ -1856,4 +1896,4 @@ window.api.statusGet().then(b => {
 }
 
 if (typeof document !== 'undefined') wire();
-if (typeof module !== 'undefined') module.exports = { aposFechar, ticketsNovos, parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf, parseResumo, anexosDe, cacheGet, cachePut, showNoticeIn };
+if (typeof module !== 'undefined') module.exports = { aposFechar, ticketsNovos, parseBR, minutesSince, ageLabel, ageBucket, statusKey, norm, matches, prettyXml, kindOf, parseResumo, notasBlocos, anexosDe, cacheGet, cachePut, showNoticeIn };

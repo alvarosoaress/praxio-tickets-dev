@@ -970,23 +970,25 @@ select option { background: var(--surface-2); color: var(--text); }
 /* Duas secoes e N repositorios: a altura deixa de ser previsivel, entao o dialog vira
    coluna com corpo rolavel — mesmo padrao do #resumo. O :not([open]) e obrigatorio:
    sem ele o display:flex sobrepoe o display:none do UA e o dialog fica visivel fechado. */
-#cfg {
+#cfg, #novidades {
   display: flex;
   flex-direction: column;
   max-height: min(640px, calc(100vh - 80px));
   overflow: hidden;
 }
 
-#cfg:not([open]) { display: none; }
+#cfg:not([open]), #novidades:not([open]) { display: none; }
 
-#cfg form {
+#cfg form, #novidades form {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
 
-#cfg .dlg-body { flex: 1; min-height: 0; overflow: auto; }
+#cfg .dlg-body, #novidades .dlg-body { flex: 1; min-height: 0; overflow: auto; }
+#novidades .dlg-body h3 { margin: 0 0 8px; }
+#novidades .dlg-body p { margin-bottom: 10px; }
 
 /* Filete de 1px separa as secoes. Caixa em volta seria card dentro de card. */
 .dlg-body h3 { padding-top: 17px; border-top: 1px solid var(--line); }

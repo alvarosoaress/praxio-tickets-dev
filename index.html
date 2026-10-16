@@ -259,6 +259,22 @@
   </form>
 </dialog>
 
+<!-- Novidades da release, abertas uma vez por versao. As notas sao o corpo da release no
+     GitHub e entram como texto (notasBlocos), nunca como HTML. -->
+<dialog id="novidades">
+  <form method="dialog" id="novidadesForm">
+    <div class="dlg-body">
+      <h2>Versão nova disponível</h2>
+      <p id="novidadesVer"></p>
+      <div id="novidadesNotas"></div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" type="button" id="novidadesNo">Agora não</button>
+      <button class="btn btn-primary" type="submit" id="novidadesYes">Instalar e reabrir</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- Um dialog para todos os momentos que cercam a analise: escolher o repositorio e explicar
      o que impediu. Varios dialogs seriam varias telas para o mesmo momento: "antes de
      comecar, isto". Falha ao escrever o briefing NAO vem para ca — vai
