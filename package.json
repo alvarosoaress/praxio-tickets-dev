@@ -1,6 +1,6 @@
 {
   "name": "tickets",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Tickets abertos que precisam de acao do time de desenvolvimento",
   "main": "main.js",
   "scripts": {
