@@ -49,8 +49,13 @@ Regras do texto:
 
 - Português, frases curtas, uma novidade por item.
 - Diga o que a pessoa faz ou vê, com o nome do botão como aparece na tela.
-- Grupos na ordem: `## Novidades`, `## Melhorias`, `## Correções`. Grupo vazio sai.
-- Se o usuário precisa agir para usar algo, diga onde (ex.: Configurações → Azure DevOps).
+- Um `## Título` por funcionalidade, com o nome que a pessoa reconhece na tela
+  (ex.: `## Botão Criar Bug`, `## Aviso de versão nova`). Embaixo, uma linha dizendo o que
+  ela é e, depois, os itens com o que ela faz.
+- Mudança pequena que não forma uma funcionalidade vai no fim, em `## Melhorias` ou
+  `## Correções`. Grupo vazio sai.
+- Se o usuário precisa agir para usar algo, diga onde, como o último item da própria
+  funcionalidade (ex.: Configurações → Azure DevOps).
 - Nada de nome de arquivo, função, IPC ou commit.
 - Sem introdução nem fechamento.
 
