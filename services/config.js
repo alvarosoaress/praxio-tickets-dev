@@ -33,6 +33,11 @@ const setClaudeOk = () => writeCfg({ ...readCfg(), claudeOk: CONSENT_V });
 const repos = () => { const r = readCfg().repos; return Array.isArray(r) ? r : []; };
 const setRepos = list => writeCfg({ ...readCfg(), repos: list });
 
+// Subpasta dos briefings da Analise, relativa a raiz de cada repo. Quem valida e
+// ipc/config.js (limparPasta); aqui so le e grava.
+const pastaBriefing = () => readCfg().pastaBriefing;
+const setPastaBriefing = p => writeCfg({ ...readCfg(), pastaBriefing: p });
+
 // Id da listagem escolhida. Quem confere contra LISTAS e ipc/config.js.
 const lista = () => readCfg().lista;
 const setLista = id => writeCfg({ ...readCfg(), lista: id });
@@ -42,4 +47,4 @@ const setLista = id => writeCfg({ ...readCfg(), lista: id });
 const azure = () => { const c = readCfg(); return c.azurePat ? { pat: c.azurePat, email: c.azureEmail, nome: c.azureNome } : null; };
 const setAzure = a => writeCfg({ ...readCfg(), azurePat: a.pat, azureEmail: a.email, azureNome: a.nome });
 
-module.exports = { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos, lista, setLista, azure, setAzure };
+module.exports = { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos, pastaBriefing, setPastaBriefing, lista, setLista, azure, setAzure };

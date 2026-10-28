@@ -7,7 +7,7 @@ const { buildPrompt, buildContent, parseResult, parseSize, escolherAnexos, lerDo
         MAX_IMAGENS, MAX_PDFS, MAX_TEXTOS, MAX_ANEXOS, MAX_TEXTO_TOTAL } = require('./services/claude.js');
 const { respHeaders } = require('./services/anexo.js');
 const { parseResumo, notasBlocos } = require('./renderer.js');
-const { slugTicket, deepLink, buildBriefing, MAX_SLUG } = require('./services/briefing.js');
+const { slugTicket, limparPasta, deepLink, buildBriefing, MAX_SLUG } = require('./services/briefing.js');
 const { maisNova } = require('./services/update.js');
 
 // notas da release: markdown vira blocos de texto, sem marcacao
@@ -270,6 +270,19 @@ assert.strictEqual(slugTicket(''), null, 'vazio e null, nao string vazia virando
 assert.strictEqual(slugTicket(null), null);
 assert.strictEqual(slugTicket('///'), null, 'so caractere proibido tambem e null');
 assert.ok(slugTicket('9'.repeat(200)).length <= MAX_SLUG);
+
+// pasta da analise: vem da tela e vira caminho de escrita. Tudo tem que ficar DENTRO do
+// repo e fora do .git, e invalido e null para o ipc manter o que havia
+assert.strictEqual(limparPasta('.tickets'), '.tickets');
+assert.strictEqual(limparPasta(' docs\\tickets\\ '), 'docs/tickets');
+assert.strictEqual(limparPasta('/abs/x'), 'abs/x', 'barra no comeco nao vira caminho absoluto');
+assert.strictEqual(limparPasta('C:\\x'), null);
+assert.strictEqual(limparPasta('a/../b'), null);
+assert.strictEqual(limparPasta('...'), null);
+assert.strictEqual(limparPasta('.GIT/hooks'), null);
+assert.strictEqual(limparPasta('a b'), null);
+assert.strictEqual(limparPasta(''), null);
+assert.strictEqual(limparPasta(null), null);
 
 // deep link: a URL passa por um handler do SO, e um espaco ou uma quebra crua ali ja
 // bastam para ele receber outra coisa. O & tem que ser exatamente um — o que separa cwd de

@@ -191,7 +191,7 @@ muda além de um arquivo, então não há o que confirmar no meio.
    handler `claude-cli://` o passo 3 não abriria nada e o `.md` ficaria largado.
 3. Impedimento volta como código (`NO_RESUMO`, `NO_SLUG`, `NO_REPO`, `NO_DIR`,
    `NO_DEEPLINK`) e abre o `#analiseAsk` — o mesmo dialog que fez a pergunta do repositório.
-4. Escreve `TICKET-<slug>.md` na raiz do repo, acrescenta o nome ao `.git/info/exclude`
+4. Escreve `TICKET-<slug>.md` na subpasta configurada (padrão `.tickets`), acrescenta `/<subpasta>/` ao `.git/info/exclude`
    (quando `.git` é pasta), e chama `abrirNoTerminal()` (`services/claude.js`): um
    `shell.openExternal` na URL `claude-cli://open?cwd=…&q=…` que `deepLink()`
    (`services/briefing.js`) montou. O Claude sobe **com a frase na caixa e não enviada** —

@@ -1,6 +1,7 @@
 const { ipcMain, dialog, BrowserWindow } = require('electron');
-const { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos, lista, setLista } = require('../services/config');
+const { KEY_LENGTH, apiKey, setApiKey, claudeOk, setClaudeOk, repos, setRepos, pastaBriefing, setPastaBriefing, lista, setLista } = require('../services/config');
 const { LISTAS } = require('../services/portalapi');
+const { limparPasta, PASTA_PADRAO } = require('../services/briefing');
 
 const MAX_REPOS = 20;
 const MAX_PATH = 400;
@@ -42,7 +43,14 @@ function register() {
   ipcMain.handle('claude-ok', () => claudeOk());
   ipcMain.handle('claude-allow', () => { setClaudeOk(); return { ok: true }; });
 
-  ipcMain.handle('get-repos', () => ({ repos: repos() }));
+  ipcMain.handle('get-repos', () => ({ repos: repos(), pasta: limparPasta(pastaBriefing()) || PASTA_PADRAO }));
+
+  ipcMain.handle('set-pasta', (_e, p) => {
+    const limpo = limparPasta(p);
+    if (!limpo) return { error: 'Use um caminho relativo ao repositório, só com letras, números, ponto, hífen e _.' };
+    setPastaBriefing(limpo);
+    return { ok: true, pasta: limpo };
+  });
 
   ipcMain.handle('set-repos', (_e, list) => {
     const limpo = limpar(list);

@@ -5,7 +5,7 @@ A fronteira com o renderer. Um arquivo por domínio, cada um exportando `registe
 
 | Arquivo      | Canais                                          |
 | ------------ | ----------------------------------------------- |
-| `config.js`  | `has-key`, `set-key`, `claude-ok`, `claude-allow`, `get-repos`, `set-repos`, `get-listas`, `set-lista`, `pick-dir` |
+| `config.js`  | `has-key`, `set-key`, `claude-ok`, `claude-allow`, `get-repos`, `set-repos`, `set-pasta`, `get-listas`, `set-lista`, `pick-dir` |
 | `tickets.js` | `tickets`, `ticket-detail`, `ticket-views`       |
 | `anexos.js`  | `anexo-text`, `anexo-html` + `registerProtocol()` |
 | `resumo.js`  | `resumo`                                         |
@@ -52,7 +52,8 @@ default que ressuscita sozinho não é default.
 
 ## `analise.js`
 
-Um canal só: escreve `TICKET-<n>.md` na raiz do repositório e abre o Claude nele. Nenhum
+Um canal só: escreve `TICKET-<n>.md` na subpasta de Configurações → Pasta da Análise
+(padrão `.tickets`, validada por `limparPasta`) e abre o Claude no repositório. Nenhum
 comando git — sem branch, sem stash, então não há pergunta no meio.
 
 O renderer manda `{ id, ticket, repoIdx }` e **nunca um caminho**: `repoIdx` é o índice de

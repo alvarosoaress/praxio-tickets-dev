@@ -1,6 +1,6 @@
 'use strict';
 
-// O briefing da Analise: o .md que vai para a raiz do repositorio e o link que abre o Claude
+// O briefing da Analise: o .md que vai para a subpasta do repositorio e o link que abre o Claude
 // nele. Nao importa electron de proposito: slugTicket, buildBriefing e deepLink sao puros e
 // o test.js precisa importa-los sem subir o Electron.
 //
@@ -9,6 +9,23 @@ const fs = require('fs');
 const path = require('path');
 
 const MAX_SLUG = 40;
+const MAX_PASTA = 120;
+const PASTA_PADRAO = '.tickets';
+
+// A subpasta dos briefings, relativa a raiz do repo. Vem da tela de Configuracoes e vira
+// caminho de escrita E texto da URL que abre o Claude, entao e allowlist como o slug: cada
+// segmento so com [A-Za-z0-9._-], sem segmento so de pontos (mata `..`) e sem `.git`.
+// Barra no comeco nao faz caminho absoluto: os segmentos vazios somem e tudo fica dentro
+// do repo. Invalido e null — quem chama decide manter o que havia.
+function limparPasta(bruto) {
+  const segs = String(bruto == null ? '' : bruto).trim().split(/[\\/]+/).filter(Boolean);
+  if (!segs.length) return null;
+  for (const s of segs) {
+    if (!/^[A-Za-z0-9._-]+$/.test(s) || /^\.+$/.test(s) || s.toLowerCase() === '.git') return null;
+  }
+  const p = segs.join('/');
+  return p.length <= MAX_PASTA ? p : null;
+}
 
 // A fronteira com o mundo de fora do app. O slug vira nome de arquivo E parte da URL que
 // abre o Claude — dois lugares onde um caractere errado custa caro. Por
@@ -36,7 +53,7 @@ function slugTicket(number) {
 // mandar.
 function deepLink(cwd, arquivo) {
   const q = 'Nao altere nenhum arquivo ainda: este primeiro passo e levantamento.\n'
-          + `Leia ${arquivo} na raiz deste repositorio e faca o levantamento inicial descrito nele.`;
+          + `Leia ${arquivo} neste repositorio e faca o levantamento inicial descrito nele.`;
   return `claude-cli://open?cwd=${encodeURIComponent(cwd)}&q=${encodeURIComponent(q)}`;
 }
 
@@ -89,22 +106,26 @@ _Gerado pelo app Tickets. Fora do versionamento (\`.git/info/exclude\`); pode ap
 `;
 }
 
-// O briefing entra no repositorio do time, entao nao pode sujar o working tree dele: vai
-// para info/exclude, que e local do clone, e nao para o .gitignore, que e versionado e nao
-// e do app. Falhar no exclude nao derruba o fluxo — sem ele o arquivo so aparece no status.
-function excluir(gitDir, nome) {
+// O briefing entra no repositorio do time, entao nao pode sujar o working tree dele: a
+// subpasta vai para info/exclude, que e local do clone, e nao para o .gitignore, que e
+// versionado e nao e do app. Falhar no exclude nao derruba o fluxo — sem ele a pasta so
+// aparece no status.
+function excluir(gitDir, linha) {
   try {
     const ex = path.join(gitDir, 'info', 'exclude');
     const atual = fs.existsSync(ex) ? fs.readFileSync(ex, 'utf8') : '';
-    if (atual.split(/\r?\n/).includes(nome)) return;
+    if (atual.split(/\r?\n/).includes(linha)) return;
     fs.mkdirSync(path.dirname(ex), { recursive: true });
-    fs.appendFileSync(ex, (atual && !atual.endsWith('\n') ? '\n' : '') + nome + '\n');
+    fs.appendFileSync(ex, (atual && !atual.endsWith('\n') ? '\n' : '') + linha + '\n');
   } catch {}
 }
 
-function escreverBriefing(repo, slug, texto) {
-  const nome = `TICKET-${slug}.md`;
+// `pasta` ja passou por limparPasta. O nome devolvido e relativo ao repo, com /, porque e
+// assim que ele aparece no texto que o Claude le.
+function escreverBriefing(repo, pasta, slug, texto) {
+  const nome = `${pasta}/TICKET-${slug}.md`;
   try {
+    fs.mkdirSync(path.join(repo, pasta), { recursive: true });
     fs.writeFileSync(path.join(repo, nome), texto, 'utf8');
   } catch (e) {
     return { error: `Não foi possível escrever ${nome}: ${e.message}` };
@@ -112,8 +133,8 @@ function escreverBriefing(repo, slug, texto) {
   // ponytail: so .git como pasta na raiz; worktree (.git arquivo) ou pasta fora de git fica
   // sem exclude, e o .md so aparece no status
   const gitDir = path.join(repo, '.git');
-  try { if (fs.statSync(gitDir).isDirectory()) excluir(gitDir, nome); } catch {}
+  try { if (fs.statSync(gitDir).isDirectory()) excluir(gitDir, `/${pasta}/`); } catch {}
   return { nome };
 }
 
-module.exports = { slugTicket, deepLink, buildBriefing, escreverBriefing, MAX_SLUG };
+module.exports = { slugTicket, limparPasta, deepLink, buildBriefing, escreverBriefing, MAX_SLUG, PASTA_PADRAO };

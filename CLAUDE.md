@@ -141,7 +141,7 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
     levar junto os `.md` da raiz do repositório do módulo (`lerDocs`, `services/claude.js`):
     até ali só saía conteúdo de ticket, agora sai documentação interna do código. Só `.md`,
     só a raiz, e código-fonte nunca. A Análise também escreve
-    o resumo num `.md` dentro do repo e o entrega ao `claude` — e só existe onde já há
+    o resumo num `.md` dentro do repo (na subpasta de Configurações → Pasta da Análise) e o entrega ao `claude` — e só existe onde já há
     resumo, ou seja, onde `claudeOk` já foi dado. `ipc/analise.js` confere de novo na
     fronteira: sem resumo em cache, `NO_RESUMO` e nada acontece. O resumo entrega
     título, cliente e o texto dos trâmites ao `claude` do PATH. Sem `claudeOk` no
@@ -196,7 +196,7 @@ renderer  ──IPC──▶  main  ──HTTPS+chave──▶  portalapi  ─�
 | Clicar Análise não abre terminal nenhum         | O link do sistema recusa caminho de rede, UNC e `..`. Um repositório em `\\servidor\dev` não abre, e o app não descobre isso antes — aponte uma pasta local |
 | Análise abre o terminal e ele fecha na hora, sem erro | O handler do `claude-cli://` não achou o `wt` no PATH e caiu para um `powershell` preso ao console dele, que morre junto quando o handler sai. O alias `wt.exe` mora em `%LOCALAPPDATA%\Microsoft\WindowsApps`; `garantirWt()` (`services/claude.js`) o põe no PATH antes do link. Se voltar, confira se o Windows Terminal está instalado |
 | Nada é enviado ao Claude quando o terminal abre | Esperado: o link **preenche** a caixa e para. Ler, editar e apertar Enter é do usuário — é a única coisa que sai daqui para o modelo nesse passo |
-| `TICKET-<n>.md` aparece no `git status`         | O append no `.git/info/exclude` falhou, ou o `.git` da raiz não é pasta (worktree). É só ruído — o arquivo pode ser apagado |
+| `.tickets/` (ou a pasta da Análise) aparece no `git status` | O append no `.git/info/exclude` falhou, ou o `.git` da raiz não é pasta (worktree). É só ruído — o arquivo pode ser apagado |
 | A faixa de "versão nova" nunca aparece          | Ou o app roda de `npm start` — sem instalação para trocar, `checar()` sai em `{ atual: true }` —, ou a tag da release não é maior que a `version` do `package.json`. Tag igual à versão instalada não notifica. O que a atualização roda é o **instalador** da release, com `/S --force-run`: o `.exe` da pasta nunca é sobrescrito à mão |
 | O popup de novidades não abre de novo           | Esperado: abre uma vez por versão, lembrada no `localStorage` (`tickets.novidades`, `checkUpdate` em `renderer.js`). A faixa âmbar segue até instalar. As notas são o corpo da release no GitHub, mostradas como texto |
 | O app leva ~10 s para abrir, toda vez           | Sintoma do target `portable`, trocado por `nsis` justamente por isso: o `portable.nsi` apaga e re-extrai os ~380 MB no `%TEMP%` a cada abertura, e apaga de novo ao fechar. São dois `RMDir /r` no mesmo template — não há cache, e `unpackDirName` não muda isso. Não voltar |

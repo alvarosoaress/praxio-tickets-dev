@@ -323,6 +323,14 @@
       <div id="cfgRepos"></div>
       <button class="btn" type="button" id="cfgAddRepo">Adicionar repositório</button>
 
+      <h3>Pasta da Análise</h3>
+      <p>Onde a Análise grava o <code>TICKET-&lt;número&gt;.md</code>, relativa à raiz do repositório escolhido. Fica fora do git e salva sozinha.</p>
+      <div class="field" id="cfgPastaField">
+        <label for="cfgPasta">Subpasta</label>
+        <input id="cfgPasta" type="text" placeholder=".tickets" autocomplete="off" spellcheck="false">
+        <div class="counter"><span id="cfgPastaError" class="err"></span></div>
+      </div>
+
       <h3>Azure DevOps</h3>
       <p>Criar Bug, no detalhe do ticket, abre o card no board Run SIGAI em seu nome. Cole o seu token pessoal com o escopo <b>Work Items (Read &amp; write)</b>, gerado em <a href="https://dev.azure.com/praxio/_usersSettings/tokens" target="_blank" rel="noreferrer">dev.azure.com/praxio</a>. Ele fica só nesta máquina e salva sozinho ao colar.</p>
       <p>Cada Bug leva ao Azure da Praxio o número, título, cliente, solicitante e abertura do ticket, o trâmite de escalação inteiro, o resumo do Claude e todos os anexos do ticket.</p>

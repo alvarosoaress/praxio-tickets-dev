@@ -1109,7 +1109,7 @@ function abrirAnaliseAsk(titulo, texto, codigo, confirmLabel, opcoes) {
 // e uma opcao e lista vazia nem chega a perguntar. A analise nao tem esse caminho: sem
 // repositorio nao ha onde escrever o .md nem onde abrir o Claude.
 async function escolherRepo(semRepo) {
-  const { repos = [] } = await window.api.getRepos();
+  const { repos = [], pasta } = await window.api.getRepos();
   if (!repos.length) {
     if (semRepo) return -1;
     const [titulo, texto] = analiseErro({ error: 'NO_REPO' });
@@ -1122,7 +1122,7 @@ async function escolherRepo(semRepo) {
 
   const v = await abrirAnaliseAsk('Em qual repositório?',
     semRepo ? 'Escolha o repositório do módulo deste ticket. O Claude lê os arquivos .md da raiz dele, como o CLAUDE.md, para citar no resumo as units, telas e rotinas pelo nome certo. Nenhum código-fonte é lido. Sem repositório o resumo também sai, só menos preciso.'
-            : 'Escolha o repositório do módulo deste ticket. O app grava nele, na raiz, um TICKET-<número>.md com o resumo, e abre o Claude dentro dessa pasta para ler o código e investigar a causa. Nada é alterado no git: nenhuma branch, nenhum commit.',
+            : `Escolha o repositório do módulo deste ticket. O app grava nele, em ${pasta}/, um TICKET-<número>.md com o resumo, e abre o Claude dentro dessa pasta para ler o código e investigar a causa. Nada é alterado no git: nenhuma branch, nenhum commit.`,
     null, 'Continuar', opcoes);
   return v === null ? null : Number(v);
 }
@@ -1514,6 +1514,9 @@ async function openConfig() {
 
   cfgRepos = res.repos || [];
   renderRepos();
+  $('cfgPasta').value = res.pasta || '';
+  $('cfgPastaError').textContent = '';
+  $('cfgPastaField').dataset.invalid = '0';
   renderStatus();
 }
 
@@ -1826,6 +1829,15 @@ $('cfgLista').addEventListener('change', async e => {
 
 $('cfgRepos').addEventListener('change', e => {
   if (e.target.classList.contains('repo-input')) saveRepos();
+});
+
+// Autosave, como os repositorios. O main normaliza (`docs\x` vira `docs/x`), e a tela
+// mostra o que ficou gravado.
+$('cfgPasta').addEventListener('change', async e => {
+  const r = await window.api.setPasta(e.target.value);
+  $('cfgPastaField').dataset.invalid = r.error ? '1' : '0';
+  $('cfgPastaError').textContent = r.error || '';
+  if (r.pasta) e.target.value = r.pasta;
 });
 
 $('tabFila').addEventListener('click', () => irPara(null));

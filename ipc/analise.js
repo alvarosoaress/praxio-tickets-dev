@@ -1,6 +1,6 @@
 const { ipcMain } = require('electron');
 const fs = require('fs');
-const { repos } = require('../services/config');
+const { repos, pastaBriefing } = require('../services/config');
 const { abrirNoTerminal, temDeepLink } = require('../services/claude');
 const briefing = require('../services/briefing');
 const cache = require('../services/resumos');
@@ -30,7 +30,8 @@ async function analisar(id, ticket, repoIdx) {
   if (!await temDeepLink()) return { error: 'NO_DEEPLINK' };
 
   const texto = briefing.buildBriefing(ticket, hit.text, slug);
-  const b = briefing.escreverBriefing(repo.path, slug, texto);
+  const pasta = briefing.limparPasta(pastaBriefing()) || briefing.PASTA_PADRAO;
+  const b = briefing.escreverBriefing(repo.path, pasta, slug, texto);
   if (b.error) return b;
 
   abrirNoTerminal(repo.path, b.nome);
